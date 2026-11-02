@@ -1,0 +1,11 @@
+// Prisma schema for Sajsub Tech.
+// Application models are added in the database design phase.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
