@@ -12,19 +12,34 @@ export const updateItemSchema = z.strictObject({ quantity });
 export const productIdParamSchema = z.object({ productId: z.uuid('Invalid product') });
 export const addWishlistSchema = z.strictObject({ productId: z.uuid('Invalid product') });
 
-export const placeOrderSchema = z.strictObject({
-  shippingAddress: z.strictObject({
-    fullName: required(200),
-    phone: z.string().trim().regex(/^\+?[0-9 ()-]{6,30}$/, 'Enter a valid phone number'),
-    line1: required(255),
-    line2: optional(255),
-    city: required(120),
-    state: optional(120),
-    postalCode: optional(20),
-    country: required(100),
-  }),
-  customerNote: optional(1000),
-});
+const addressFields = {
+  fullName: required(200),
+  phone: z.string().trim().regex(/^\+?[0-9 ()-]{6,30}$/, 'Enter a valid phone number'),
+  line1: required(255),
+  line2: optional(255),
+  city: required(120),
+  state: optional(120),
+  postalCode: optional(20),
+  country: required(100),
+};
+
+export const addressSchema = z.strictObject({ ...addressFields, isDefault: z.boolean().optional() });
+
+export const placeOrderSchema = z
+  .strictObject({
+    addressId: z.uuid('Choose an address').optional(),
+    shippingAddress: z.strictObject(addressFields).optional(),
+    paymentMethod: z.enum(['CASH_ON_DELIVERY'], 'This payment method is not available yet'),
+    // Created once per checkout by the browser, so a retry can't create a second order.
+    idempotencyKey: z.uuid('Invalid checkout request'),
+    // The total the customer saw. It is only compared against the server's own calculation.
+    expectedTotal: z.string().regex(/^\d{1,10}\.\d{2}$/).optional(),
+    customerNote: optional(1000),
+  })
+  .refine(({ addressId, shippingAddress }) => Boolean(addressId) !== Boolean(shippingAddress), {
+    message: 'Choose a shipping address',
+    path: ['addressId'],
+  });
 
 export const customerOrderListSchema = paginationSchema;
 

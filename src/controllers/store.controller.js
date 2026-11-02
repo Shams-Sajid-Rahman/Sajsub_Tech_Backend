@@ -1,3 +1,4 @@
+import * as addresses from '../services/address.service.js';
 import * as cart from '../services/cart.service.js';
 import * as orders from '../services/customerOrder.service.js';
 import { sendContactEmail } from '../services/email.service.js';
@@ -27,8 +28,19 @@ export const addWishlistItem = async (req, res) =>
   sendSuccess(res, await wishlist.addWishlistItem(req.user.id, body(req).productId), { status: 201 });
 export const removeWishlistItem = async (req, res) => sendSuccess(res, await wishlist.removeWishlistItem(req.user.id, productId(req)));
 
-export const placeOrder = async (req, res) =>
-  sendSuccess(res, await orders.placeOrder(req.user.id, body(req)), { status: 201, message: 'Order placed' });
+export const moveWishlistItemToCart = async (req, res) =>
+  sendSuccess(res, await wishlist.moveWishlistItemToCart(req.user.id, productId(req)), { message: 'Moved to cart' });
+
+export const getAddresses = async (req, res) => sendSuccess(res, await addresses.listAddresses(req.user.id));
+export const createAddress = async (req, res) =>
+  sendSuccess(res, await addresses.createAddress(req.user.id, body(req)), { status: 201, message: 'Address saved' });
+export const deleteAddress = async (req, res) =>
+  sendSuccess(res, await addresses.deleteAddress(req.user.id, req.validated.params.id), { message: 'Address deleted' });
+
+export const placeOrder = async (req, res) => {
+  const { order, created } = await orders.placeOrder(req.user.id, body(req));
+  sendSuccess(res, order, { status: created ? 201 : 200, message: 'Order placed' });
+};
 export const getOrders = async (req, res) => {
   const { query } = req.validated;
   const { items, total } = await orders.listCustomerOrders(req.user.id, query);

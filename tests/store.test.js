@@ -32,6 +32,7 @@ const customer = async (name) => {
   return { user, get: (path) => agent.get(path), post: send('post'), patch: send('patch'), put: send('put'), delete: send('delete') };
 };
 
+const checkout = () => ({ shippingAddress: ADDRESS, paymentMethod: 'CASH_ON_DELIVERY', idempotencyKey: randomUUID() });
 const ADDRESS = { fullName: 'Test Buyer', phone: '+1 555 010 1234', line1: '1 Test St', city: 'Testville', country: 'Testland' };
 
 after(async () => {
@@ -60,7 +61,8 @@ test('the cart calculates prices from the database and rejects prices from the b
 
   const added = await buyer.post('/api/cart/items', { productId: product.id, quantity: 2 });
   assert.equal(added.status, 201);
-  assert.equal(added.body.data.subtotal, '120.00');
+  assert.equal(added.body.data.subtotal, '200.00');
+  assert.equal(added.body.data.discount, '80.00');
   assert.equal(added.body.data.itemCount, 2);
 
   const faked = await buyer.post('/api/cart/items', { productId: product.id, quantity: 1, price: '1.00' });
@@ -73,7 +75,8 @@ test('the cart calculates prices from the database and rejects prices from the b
   assert.equal((await buyer.patch(`/api/cart/items/${product.id}`, { quantity: 0 })).status, 400);
   assert.equal((await buyer.patch(`/api/cart/items/${product.id}`, { quantity: 11 })).status, 409);
   const updated = await buyer.patch(`/api/cart/items/${product.id}`, { quantity: 1 });
-  assert.equal(updated.body.data.subtotal, '60.00');
+  assert.equal(updated.body.data.subtotal, '100.00');
+  assert.equal(updated.body.data.discount, '40.00');
 
   const removed = await buyer.delete(`/api/cart/items/${product.id}`);
   assert.equal(removed.body.data.items.length, 0);
@@ -102,10 +105,10 @@ test('checkout creates the order, snapshots prices, takes stock and empties the 
   const product = await makeProduct({ price: '30.00', stockQuantity: 5 });
   await buyer.post('/api/cart/items', { productId: product.id, quantity: 2 });
 
-  const bad = await buyer.post('/api/orders', { shippingAddress: { ...ADDRESS, city: '' } });
+  const bad = await buyer.post('/api/orders', { ...checkout(), shippingAddress: { ...ADDRESS, city: '' } });
   assert.equal(bad.status, 400);
 
-  const placed = await buyer.post('/api/orders', { shippingAddress: ADDRESS });
+  const placed = await buyer.post('/api/orders', checkout());
   assert.equal(placed.status, 201);
   const order = placed.body.data;
   assert.equal(order.items[0].unitPrice, '30');
@@ -122,7 +125,7 @@ test('checkout creates the order, snapshots prices, takes stock and empties the 
   assert.equal(detail.body.data.items[0].unitPrice, '30', 'history keeps the price paid');
   assert.equal((await buyer.get('/api/orders')).body.meta.total, 1);
 
-  assert.equal((await buyer.post('/api/orders', { shippingAddress: ADDRESS })).status, 400, 'empty cart');
+  assert.equal((await buyer.post('/api/orders', checkout())).status, 400, 'empty cart');
 });
 
 test('free shipping applies at the threshold', async () => {
@@ -144,7 +147,7 @@ test('stock problems at checkout leave no order and no stock change', async () =
   await buyer.post('/api/cart/items', { productId: scarce.id, quantity: 2 });
   await prisma.product.update({ where: { id: scarce.id }, data: { stockQuantity: 1 } });
 
-  const res = await buyer.post('/api/orders', { shippingAddress: ADDRESS });
+  const res = await buyer.post('/api/orders', checkout());
   assert.equal(res.status, 409);
   assert.equal((await prisma.product.findUnique({ where: { id: fine.id } })).stockQuantity, 5);
   assert.equal(await prisma.order.count({ where: { userId: buyer.user.id } }), 0);
@@ -155,7 +158,7 @@ test('two customers cannot both buy the last item', async () => {
   const product = await makeProduct({ stockQuantity: 1 });
   const buyers = await Promise.all([customer('race1'), customer('race2')]);
   for (const buyer of buyers) await buyer.post('/api/cart/items', { productId: product.id });
-  const results = await Promise.allSettled(buyers.map(({ user }) => placeOrder(user.id, { shippingAddress: ADDRESS })));
+  const results = await Promise.allSettled(buyers.map(({ user }) => placeOrder(user.id, checkout())));
   assert.equal(results.filter(({ status }) => status === 'fulfilled').length, 1);
   assert.equal((await prisma.product.findUnique({ where: { id: product.id } })).stockQuantity, 0);
 });
@@ -165,7 +168,7 @@ test('customers see only their own orders, and can cancel only pending ones', as
   const other = await customer('other');
   const product = await makeProduct({ stockQuantity: 5 });
   await owner.post('/api/cart/items', { productId: product.id });
-  const { id } = (await owner.post('/api/orders', { shippingAddress: ADDRESS })).body.data;
+  const { id } = (await owner.post('/api/orders', checkout())).body.data;
 
   assert.equal((await other.get(`/api/orders/${id}`)).status, 404);
   assert.equal((await other.post(`/api/orders/${id}/cancel`)).status, 404);
@@ -184,7 +187,7 @@ test('only customers who received a product can review it, and ratings update', 
   assert.equal((await buyer.put(path, { rating: 5 })).status, 403);
 
   await buyer.post('/api/cart/items', { productId: product.id });
-  const { id } = (await buyer.post('/api/orders', { shippingAddress: ADDRESS })).body.data;
+  const { id } = (await buyer.post('/api/orders', checkout())).body.data;
   await prisma.order.update({ where: { id }, data: { status: 'DELIVERED' } });
 
   assert.equal((await buyer.put(path, { rating: 9 })).status, 400);

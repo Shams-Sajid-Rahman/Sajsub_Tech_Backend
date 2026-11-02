@@ -20,30 +20,56 @@ export const calculateShipping = async (client, subtotal) => {
 
 const CART_ITEMS = { orderBy: { createdAt: 'asc' }, include: { product: { include: CARD_INCLUDE } } };
 
+// List-price subtotal, savings, shipping and total. Shipping is based on what the customer pays for goods.
+export const calculateTotals = async (client, lines) => {
+  const zero = new Prisma.Decimal(0);
+  const subtotal = lines.reduce((sum, { price, quantity }) => sum.plus(price.times(quantity)), zero);
+  const goods = lines.reduce((sum, { unitPrice, quantity }) => sum.plus(unitPrice.times(quantity)), zero);
+  const shipping = await calculateShipping(client, goods);
+  return { subtotal, discount: subtotal.minus(goods), shipping, total: goods.plus(shipping) };
+};
+
+const findIssue = (product, quantity) => {
+  if (!isPurchasable(product)) return 'UNAVAILABLE';
+  if (product.stockQuantity === 0) return 'OUT_OF_STOCK';
+  if (product.stockQuantity < quantity) return 'NOT_ENOUGH_STOCK';
+  return null;
+};
+
 const getOrCreateCart = (client, userId) =>
   client.cart.upsert({ where: { userId }, update: {}, create: { userId } });
 
 export const getCart = async (userId) => {
   const cart = await prisma.cart.findUnique({ where: { userId }, include: { items: CART_ITEMS } });
-  const items = (cart?.items ?? []).map(({ quantity, product }) => {
-    const unitPrice = product.discountPrice ?? product.price;
-    const available = isPurchasable(product) && product.stockQuantity >= quantity;
+  const rows = cart?.items ?? [];
+  const items = rows.map(({ quantity, product }) => {
+    const issue = findIssue(product, quantity);
     return {
       productId: product.id,
       quantity,
-      available,
-      lineTotal: unitPrice.times(quantity).toFixed(2),
+      available: !issue,
+      issue,
+      // Only revealed when it explains a problem. Normally customers see just "in stock".
+      stockAvailable: issue === 'NOT_ENOUGH_STOCK' ? product.stockQuantity : undefined,
+      lineTotal: (product.discountPrice ?? product.price).times(quantity).toFixed(2),
       product: toPublicProduct(product),
     };
   });
-  const subtotal = items.reduce((sum, { lineTotal }) => sum.plus(lineTotal), new Prisma.Decimal(0));
-  const shipping = await calculateShipping(prisma, subtotal);
+  const totals = await calculateTotals(
+    prisma,
+    rows.map(({ quantity, product }) => ({
+      quantity,
+      price: product.price,
+      unitPrice: product.discountPrice ?? product.price,
+    })),
+  );
   return {
     items,
     itemCount: items.reduce((sum, { quantity }) => sum + quantity, 0),
-    subtotal: subtotal.toFixed(2),
-    shipping: shipping.toFixed(2),
-    total: subtotal.plus(shipping).toFixed(2),
+    subtotal: totals.subtotal.toFixed(2),
+    discount: totals.discount.toFixed(2),
+    shipping: totals.shipping.toFixed(2),
+    total: totals.total.toFixed(2),
   };
 };
 

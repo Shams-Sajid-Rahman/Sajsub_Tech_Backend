@@ -22,6 +22,14 @@ wishlistRoutes.get('/', store.getWishlist);
 wishlistRoutes.post('/items', validate({ body: schemas.addWishlistSchema }), store.addWishlistItem);
 wishlistRoutes.delete('/items/:productId', validate(byProduct), store.removeWishlistItem);
 
+wishlistRoutes.post('/items/:productId/move-to-cart', validate(byProduct), store.moveWishlistItemToCart);
+
+export const addressRoutes = Router();
+addressRoutes.use(customerOnly);
+addressRoutes.get('/', store.getAddresses);
+addressRoutes.post('/', validate({ body: schemas.addressSchema }), store.createAddress);
+addressRoutes.delete('/:id', validate({ params: idParamSchema }), store.deleteAddress);
+
 export const orderRoutes = Router();
 orderRoutes.use(customerOnly);
 orderRoutes.get('/', validate({ query: schemas.customerOrderListSchema }), store.getOrders);

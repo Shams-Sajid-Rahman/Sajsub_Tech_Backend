@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
+import { addCartItem } from './cart.service.js';
 import { CARD_INCLUDE, isPurchasable, toPublicProduct } from './product.service.js';
 
 export const getWishlist = async (userId) => {
@@ -22,6 +23,15 @@ export const addWishlistItem = async (userId, productId) => {
     create: { wishlistId: wishlist.id, productId },
   });
   return getWishlist(userId);
+};
+
+// The item only leaves the wishlist if it could be added to the cart.
+export const moveWishlistItemToCart = async (userId, productId) => {
+  const saved = await prisma.wishlistItem.findFirst({ where: { productId, wishlist: { userId } } });
+  if (!saved) throw new ApiError(404, 'This item is not in your wishlist');
+  const cart = await addCartItem(userId, { productId, quantity: 1 });
+  await prisma.wishlistItem.delete({ where: { id: saved.id } });
+  return { cart, wishlist: await getWishlist(userId) };
 };
 
 export const removeWishlistItem = async (userId, productId) => {

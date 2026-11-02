@@ -403,6 +403,7 @@ model WishlistItem {
 model Order {
   id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   orderNumber     String        @unique @db.VarChar(32)
+  idempotencyKey  String?       @db.Uuid
   userId          String        @db.Uuid
   status          OrderStatus   @default(PENDING)
   paymentStatus   PaymentStatus @default(PENDING)
@@ -426,6 +427,7 @@ model Order {
   payments              Payment[]
   inventoryTransactions InventoryTransaction[]
 
+  @@unique([userId, idempotencyKey])
   @@index([userId, placedAt])
   @@index([status, placedAt])
   @@index([paymentStatus])
