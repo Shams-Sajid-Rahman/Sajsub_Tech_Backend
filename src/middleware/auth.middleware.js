@@ -23,6 +23,21 @@ export const authenticate = async (req, res, next) => {
   next();
 };
 
+// For routes that work for guests too: a missing or expired login simply means a guest.
+export const optionalAuthenticate = async (req, res, next) => {
+  const token = req.cookies?.[ACCESS_COOKIE];
+  if (token) {
+    try {
+      const payload = verifyAccessToken(token);
+      const session = await findActiveSession(payload.sid, payload.sub);
+      if (session) req.user = session.user;
+    } catch {
+      // Treated as a guest.
+    }
+  }
+  next();
+};
+
 export const requireRole = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user?.role)) throw new ApiError(403, 'You do not have permission to do this');
   next();

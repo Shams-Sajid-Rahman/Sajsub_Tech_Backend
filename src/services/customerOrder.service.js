@@ -6,9 +6,19 @@ import { toSkipTake } from '../utils/pagination.js';
 import { updateOrderStatus } from './admin/order.service.js';
 import { calculateTotals } from './cart.service.js';
 import { adjustStock } from './inventory.service.js';
+import { refreshOrderPayments, startOnlinePayment } from './payments/payment.service.js';
+import { paymentGateway } from './payments/sslcommerz.gateway.js';
 import { isPurchasable } from './product.service.js';
 
-const ORDER_RESULT = { items: true, payments: { omit: { providerResponse: true } } };
+const ORDER_RESULT = {
+  items: true,
+  payments: { omit: { providerResponse: true, gatewayUrl: true }, orderBy: { createdAt: 'desc' } },
+  refunds: { select: { id: true, amount: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
+  statusHistory: { select: { status: true, note: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
+};
+
+// Before work starts on an order, the customer can still cancel it.
+const CANCELLABLE_STATUSES = ['PENDING', 'CONFIRMED'];
 
 const generateOrderNumber = () => {
   const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
@@ -75,6 +85,8 @@ const createOrder = (userId, { addressId, shippingAddress, paymentMethod, idempo
         totalAmount: total,
         shippingAddress: address,
         customerNote,
+        paymentMethod,
+        statusHistory: { create: { status: 'PENDING', changedById: userId } },
         items: {
           create: lines.map(({ product, quantity, unitPrice, lineTotal }) => ({
             productId: product.id,
@@ -86,7 +98,8 @@ const createOrder = (userId, { addressId, shippingAddress, paymentMethod, idempo
             lineTotal,
           })),
         },
-        payments: { create: { method: paymentMethod, amount: total } },
+        // Online attempts are created when the customer goes to the payment page.
+        ...(paymentMethod === 'CASH_ON_DELIVERY' && { payments: { create: { method: paymentMethod, amount: total } } }),
       },
     });
 
@@ -106,7 +119,10 @@ const createOrder = (userId, { addressId, shippingAddress, paymentMethod, idempo
 
 // A repeated request with the same key returns the original order instead of creating another.
 export const placeOrder = async (userId, input) => {
-  const { idempotencyKey } = input;
+  const { idempotencyKey, paymentMethod } = input;
+  if (paymentMethod === 'ONLINE' && !paymentGateway.isConfigured()) {
+    throw new ApiError(503, 'Online payment is not available right now');
+  }
   const existing = await findByKey(prisma, userId, idempotencyKey);
   if (existing) return { order: existing, created: false };
 
@@ -141,9 +157,18 @@ export const getCustomerOrder = async (userId, id) => {
   return order;
 };
 
+export const startOrderPayment = (userId, id) => startOnlinePayment(userId, id);
+
+// Asks the provider for the latest result. The browser's own claim is never used.
+export const checkOrderPayment = async (userId, id) => {
+  await getCustomerOrder(userId, id);
+  await refreshOrderPayments(id);
+  return getCustomerOrder(userId, id);
+};
+
 export const cancelCustomerOrder = async (userId, id) => {
   const order = await getCustomerOrder(userId, id);
-  if (order.status !== 'PENDING') throw new ApiError(409, 'This order can no longer be cancelled');
-  await updateOrderStatus(id, 'CANCELLED', userId);
+  if (!CANCELLABLE_STATUSES.includes(order.status)) throw new ApiError(409, 'This order can no longer be cancelled');
+  await updateOrderStatus(id, 'CANCELLED', { changedById: userId, note: 'Cancelled by the customer' });
   return getCustomerOrder(userId, id);
 };

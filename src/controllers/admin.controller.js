@@ -5,6 +5,7 @@ import * as images from '../services/admin/image.service.js';
 import * as logs from '../services/admin/log.service.js';
 import * as orders from '../services/admin/order.service.js';
 import * as products from '../services/admin/product.service.js';
+import { verifyPaymentById } from '../services/payments/payment.service.js';
 import * as stats from '../services/admin/stats.service.js';
 import * as users from '../services/admin/user.service.js';
 import { buildPaginationMeta } from '../utils/pagination.js';
@@ -105,13 +106,22 @@ export const adjustInventory = audited(
 export const getOrders = list(orders.listOrders);
 export const getOrder = read((req) => orders.getOrder(id(req)));
 export const setOrderStatus = audited('order.status_changed', 'Order', (req) =>
-  orders.updateOrderStatus(id(req), body(req).status, req.user.id),
+  (({ status, ...details }) => orders.updateOrderStatus(id(req), status, { ...details, changedById: req.user.id }))(body(req)),
 );
 
 export const getPayments = list(orders.listPayments);
 export const setPaymentStatus = audited('payment.status_changed', 'Payment', (req) =>
   orders.updatePaymentStatus(id(req), body(req).status),
 );
+export const refundPayment = audited(
+  'payment.refunded',
+  'Payment',
+  (req) => orders.refundPayment(id(req), body(req), req.user.id),
+  { status: 201, message: 'Refund recorded' },
+);
+export const verifyPayment = audited('payment.verified', 'Payment', (req) => verifyPaymentById(id(req)), {
+  message: ({ outcome }) => `Provider result: ${outcome}`,
+});
 
 export const getBanners = list(content.listBanners);
 export const createBanner = audited('banner.created', 'Banner', (req) => content.createBanner(body(req)), CREATED);

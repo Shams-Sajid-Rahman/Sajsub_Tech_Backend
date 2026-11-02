@@ -21,6 +21,13 @@ const schema = z
     CLOUDINARY_CLOUD_NAME: optionalText,
     CLOUDINARY_API_KEY: optionalText,
     CLOUDINARY_API_SECRET: optionalText,
+    SSLCOMMERZ_STORE_ID: optionalText,
+    SSLCOMMERZ_STORE_PASSWORD: optionalText,
+    // Sandbox unless explicitly turned off, so a missing setting can never take real money.
+    SSLCOMMERZ_SANDBOX: z.enum(['true', 'false']).default('true'),
+    GEMINI_API_KEY: optionalText,
+    AI_MODEL: z.preprocess((value) => value || undefined, z.string().default('gemini-3.5-flash-lite')),
+    API_PUBLIC_URL: z.preprocess((value) => value || undefined, z.url().optional()),
   })
   .refine(({ JWT_SECRET, CSRF_SECRET }) => JWT_SECRET !== CSRF_SECRET, {
     path: ['CSRF_SECRET'],
@@ -55,4 +62,11 @@ export const env = {
     apiKey: data.CLOUDINARY_API_KEY,
     apiSecret: data.CLOUDINARY_API_SECRET,
   },
+  sslcommerz: {
+    storeId: data.SSLCOMMERZ_STORE_ID,
+    storePassword: data.SSLCOMMERZ_STORE_PASSWORD,
+    sandbox: data.SSLCOMMERZ_SANDBOX === 'true',
+  },
+  ai: { apiKey: data.GEMINI_API_KEY, model: data.AI_MODEL },
+  apiPublicUrl: (data.API_PUBLIC_URL ?? `http://localhost:${data.PORT}`).replace(/\/$/, ''),
 };

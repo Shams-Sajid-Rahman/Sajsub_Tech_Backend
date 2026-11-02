@@ -9,17 +9,18 @@ const lowStockWhere = () => ({
   ...NOT_ARCHIVED,
   stockQuantity: { gt: 0, lte: prisma.product.fields.lowStockAlert },
 });
-// Revenue is what has actually been collected and not refunded.
-const REVENUE_WHERE = { paymentStatus: 'PAID', status: { notIn: ['CANCELLED', 'RETURNED'] } };
+// Revenue is what has been collected and kept: refunds are subtracted, and money waiting to be refunded is left out.
+const REVENUE_WHERE = { status: { in: ['PAID', 'PARTIALLY_REFUNDED'] }, needsRefund: false };
 
 const getDailySales = async () => {
   const start = new Date(Date.now() - (SALES_DAYS - 1) * DAY_MS);
   start.setUTCHours(0, 0, 0, 0);
 
   const rows = await prisma.$queryRaw`
-    SELECT to_char("placedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, SUM("totalAmount") AS revenue
-    FROM "orders"
-    WHERE "paymentStatus" = 'PAID' AND "status" NOT IN ('CANCELLED', 'RETURNED') AND "placedAt" >= ${start}
+    SELECT to_char(o."placedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, SUM(p."amount" - p."refundedAmount") AS revenue
+    FROM "payments" p
+    JOIN "orders" o ON o."id" = p."orderId"
+    WHERE p."status" IN ('PAID', 'PARTIALLY_REFUNDED') AND NOT p."needsRefund" AND o."placedAt" >= ${start}
     GROUP BY day`;
   const byDay = new Map(rows.map(({ day, revenue }) => [day, Number(revenue)]));
 
@@ -47,7 +48,7 @@ export const getDashboardStats = async () => {
     prisma.product.count({ where: NOT_ARCHIVED }),
     prisma.category.count({ where: { isActive: true } }),
     prisma.order.count(),
-    prisma.order.aggregate({ where: REVENUE_WHERE, _sum: { totalAmount: true } }),
+    prisma.payment.aggregate({ where: REVENUE_WHERE, _sum: { amount: true, refundedAmount: true } }),
     prisma.order.count({ where: { status: 'PENDING' } }),
     prisma.product.count({ where: lowStockWhere() }),
     prisma.product.count({ where: OUT_OF_STOCK }),
@@ -73,7 +74,7 @@ export const getDashboardStats = async () => {
       totalProducts,
       totalCategories,
       totalOrders,
-      totalRevenue: (revenue._sum.totalAmount ?? 0).toString(),
+      totalRevenue: (Number(revenue._sum.amount ?? 0) - Number(revenue._sum.refundedAmount ?? 0)).toFixed(2),
       pendingOrders,
       lowStockProducts,
       outOfStockProducts,
@@ -86,10 +87,11 @@ export const getDashboardStats = async () => {
 
 export const getNotifications = async () => {
   const select = { id: true, name: true, stockQuantity: true };
-  const [pendingOrders, outOfStock, lowStock] = await Promise.all([
+  const [pendingOrders, refundsDue, outOfStock, lowStock] = await Promise.all([
     prisma.order.count({ where: { status: 'PENDING' } }),
+    prisma.payment.count({ where: { needsRefund: true } }),
     prisma.product.findMany({ where: OUT_OF_STOCK, select, orderBy: { name: 'asc' }, take: 5 }),
     prisma.product.findMany({ where: lowStockWhere(), select, orderBy: { stockQuantity: 'asc' }, take: 5 }),
   ]);
-  return { pendingOrders, outOfStock, lowStock };
+  return { pendingOrders, refundsDue, outOfStock, lowStock };
 };

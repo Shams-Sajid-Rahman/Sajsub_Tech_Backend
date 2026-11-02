@@ -62,6 +62,8 @@ router.patch('/orders/:id/status', validate({ ...byId, body: schemas.orderStatus
 
 router.get('/payments', validate({ query: schemas.paymentListSchema }), admin.getPayments);
 router.patch('/payments/:id/status', validate({ ...byId, body: schemas.paymentStatusSchema }), admin.setPaymentStatus);
+router.post('/payments/:id/refunds', validate({ ...byId, body: schemas.refundSchema }), admin.refundPayment);
+router.post('/payments/:id/verify', validate(byId), admin.verifyPayment);
 
 router.get('/banners', validate({ query: schemas.bannerListSchema }), admin.getBanners);
 router.post('/banners', validate({ body: schemas.bannerCreateSchema }), admin.createBanner);

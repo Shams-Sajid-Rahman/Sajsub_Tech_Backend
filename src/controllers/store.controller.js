@@ -50,6 +50,11 @@ export const getOrder = async (req, res) => sendSuccess(res, await orders.getCus
 export const cancelOrder = async (req, res) =>
   sendSuccess(res, await orders.cancelCustomerOrder(req.user.id, req.validated.params.id), { message: 'Order cancelled' });
 
+export const startOrderPayment = async (req, res) =>
+  sendSuccess(res, await orders.startOrderPayment(req.user.id, req.validated.params.id), { status: 201 });
+export const checkOrderPayment = async (req, res) =>
+  sendSuccess(res, await orders.checkOrderPayment(req.user.id, req.validated.params.id));
+
 export const getRelatedProducts = async (req, res) => sendSuccess(res, await products.getRelatedProducts(slug(req)));
 export const getReviews = async (req, res) => {
   const { query } = req.validated;

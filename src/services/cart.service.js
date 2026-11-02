@@ -3,7 +3,7 @@ import { prisma } from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
 import { CARD_INCLUDE, isPurchasable, toPublicProduct } from './product.service.js';
 
-const DEFAULT_SHIPPING_FEE = 5;
+const DEFAULT_SHIPPING_FEE = 120;
 
 const getSettingNumber = async (client, key, fallback) => {
   const setting = await client.siteSetting.findUnique({ where: { key } });

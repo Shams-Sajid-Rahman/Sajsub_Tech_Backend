@@ -29,7 +29,7 @@ export const placeOrderSchema = z
   .strictObject({
     addressId: z.uuid('Choose an address').optional(),
     shippingAddress: z.strictObject(addressFields).optional(),
-    paymentMethod: z.enum(['CASH_ON_DELIVERY'], 'This payment method is not available yet'),
+    paymentMethod: z.enum(['CASH_ON_DELIVERY', 'ONLINE'], 'This payment method is not available'),
     // Created once per checkout by the browser, so a retry can't create a second order.
     idempotencyKey: z.uuid('Invalid checkout request'),
     // The total the customer saw. It is only compared against the server's own calculation.
@@ -43,10 +43,19 @@ export const placeOrderSchema = z
 
 export const customerOrderListSchema = paginationSchema;
 
+// Sent by the payment provider, or by the browser on its behalf. Only the reference is required
+// here: the other fields are kept for the signature check and confirmed with the provider.
+export const paymentCallbackSchema = z.looseObject({ tran_id: z.string().min(1).max(100), val_id: z.string().max(200).optional() });
+
 export const reviewListSchema = paginationSchema;
 export const reviewSchema = z.strictObject({
   rating: z.coerce.number().int().min(1, 'Choose a rating').max(5),
   comment: optional(2000),
+});
+
+export const aiMessageSchema = z.strictObject({
+  message: z.string().trim().min(1, 'Type a message').max(1000, 'Please keep your message under 1000 characters'),
+  conversationId: z.uuid().optional(),
 });
 
 export const contactSchema = z.strictObject({

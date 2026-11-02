@@ -16,6 +16,7 @@
   },
   "description": "Sajsub Tech API",
   "dependencies": {
+    "@google/genai": "^2.32.0",
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.11.0",

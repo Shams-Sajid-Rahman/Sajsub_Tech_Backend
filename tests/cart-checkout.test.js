@@ -55,12 +55,12 @@ after(async () => {
 
 test('the cart reports subtotal, discount, shipping and total', async () => {
   const buyer = await customer('totals');
-  const product = await makeProduct({ price: '100.00', discountPrice: '75.00' });
+  const product = await makeProduct({ price: '10000.00', discountPrice: '7500.00' });
   const { data } = (await buyer.post('/api/cart/items', { productId: product.id, quantity: 2 })).body;
-  assert.equal(data.subtotal, '200.00');
-  assert.equal(data.discount, '50.00');
+  assert.equal(data.subtotal, '20000.00');
+  assert.equal(data.discount, '5000.00');
   assert.equal(data.shipping, '0.00');
-  assert.equal(data.total, '150.00');
+  assert.equal(data.total, '15000.00');
 });
 
 test('shipping is decided by the discounted price, not the list price', async () => {

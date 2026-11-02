@@ -40,41 +40,41 @@ const BRANDS = [
 const PRODUCTS = [
   {
     name: 'MacBook Air M2', slug: 'macbook-air-m2', sku: 'DEV-APL-MBA-M2', category: 'laptops-computers', brand: 'apple',
-    price: '1249.00', discountPrice: '999.00', ratingAverage: '4.8', ratingCount: 1200, stock: 25,
+    price: '149900.00', discountPrice: '119900.00', ratingAverage: '4.8', ratingCount: 1200, stock: 25,
     specifications: { Chip: 'Apple M2', Display: '13.6-inch' },
   },
   {
     name: 'AirPods Pro (2nd Gen)', slug: 'airpods-pro-2nd-gen', sku: 'DEV-APL-APP-2', category: 'audio-headphones', brand: 'apple',
-    price: '299.00', discountPrice: '249.00', ratingAverage: '4.7', ratingCount: 856, stock: 60,
+    price: '35200.00', discountPrice: '29900.00', ratingAverage: '4.7', ratingCount: 856, stock: 60,
     specifications: { Type: 'In-ear', 'Noise cancellation': 'Active' },
   },
   {
     name: 'iPhone 16', slug: 'iphone-16', sku: 'DEV-APL-IP16', category: 'smartphones-accessories', brand: 'apple',
-    price: '1199.00', discountPrice: '899.00', ratingAverage: '4.8', ratingCount: 722, stock: 40,
+    price: '143900.00', discountPrice: '107900.00', ratingAverage: '4.8', ratingCount: 722, stock: 40,
     specifications: { Display: '6.1-inch', Chip: 'Apple A18' },
   },
   {
     name: 'Apple Watch Series 10', slug: 'apple-watch-series-10', sku: 'DEV-APL-AWS10', category: 'smartwatches-wearables', brand: 'apple',
-    price: '489.00', discountPrice: '399.00', ratingAverage: '4.7', ratingCount: 890, stock: 35,
+    price: '58400.00', discountPrice: '47900.00', ratingAverage: '4.7', ratingCount: 890, stock: 35,
     specifications: { 'Water resistance': '50 m' },
   },
   {
     name: 'PlayStation 5 DualSense', slug: 'playstation-5-dualsense', sku: 'DEV-SNY-DS5', category: 'gaming-consoles', brand: 'sony',
-    price: '69.99', discountPrice: null, ratingAverage: '4.8', ratingCount: 960, stock: 80,
+    price: '8400.00', discountPrice: null, ratingAverage: '4.8', ratingCount: 960, stock: 80,
     specifications: { Connectivity: 'Bluetooth, USB-C' },
   },
   {
     name: 'Sony WH-1000XM5', slug: 'sony-wh-1000xm5', sku: 'DEV-SNY-XM5', category: 'audio-headphones', brand: 'sony',
-    price: '349.00', discountPrice: null, ratingAverage: '4.8', ratingCount: 412, stock: 30,
+    price: '41900.00', discountPrice: null, ratingAverage: '4.8', ratingCount: 412, stock: 30,
     specifications: { Type: 'Over-ear', 'Noise cancellation': 'Active' },
   },
 ];
 
 const SETTINGS = [
-  { key: 'free_shipping_threshold', value: 50, description: 'Order total for free shipping', isPublic: true },
+  { key: 'free_shipping_threshold', value: 5000, description: 'Order total for free shipping', isPublic: true },
   { key: 'return_policy_days', value: 30, description: 'Return window in days', isPublic: true },
-  { key: 'currency', value: 'USD', description: 'Store currency', isPublic: true },
-  { key: 'shipping_fee', value: 5, description: 'Flat shipping fee below the free shipping threshold', isPublic: true },
+  { key: 'currency', value: 'BDT', description: 'Store currency', isPublic: true },
+  { key: 'shipping_fee', value: 120, description: 'Flat shipping fee below the free shipping threshold', isPublic: true },
 ];
 
 const HERO_BANNER = {
@@ -88,7 +88,7 @@ const HERO_BANNER = {
 };
 
 const ANNOUNCEMENT_BANNERS = [
-  { placement: 'ANNOUNCEMENT', title: 'Free Shipping on Orders Over $50!', sortOrder: 0 },
+  { placement: 'ANNOUNCEMENT', title: 'Free Shipping on Orders Over ৳5,000!', sortOrder: 0 },
   { placement: 'ANNOUNCEMENT', title: '30% Off This Weekend Only', sortOrder: 1 },
 ];
 
@@ -196,6 +196,10 @@ const seedDevelopmentImages = async () => {
   for (const slug of FEATURED_CATEGORY_IMAGES) {
     await prisma.category.updateMany({ where: { slug, imageUrl: null }, data: { imageUrl: `/images/categories/${slug}.png` } });
   }
+  await prisma.banner.updateMany({
+    where: { title: 'Free Shipping on Orders Over $50!' },
+    data: { title: 'Free Shipping on Orders Over ৳5,000!' },
+  });
   await prisma.banner.updateMany({ where: { placement: 'HERO', imageUrl: null }, data: { imageUrl: '/images/hero/electronics.png' } });
   const heroCount = await prisma.banner.count({ where: { placement: 'HERO' } });
   await prisma.banner.createMany({

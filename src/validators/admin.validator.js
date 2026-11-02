@@ -129,15 +129,29 @@ export const inventoryAdjustSchema = z.strictObject({
 
 // ---------- Orders and payments ----------
 
-const orderStatus = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'RETURNED']);
+const orderStatus = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']);
 const paymentStatus = z.enum(['PENDING', 'PAID', 'FAILED', 'REFUNDED', 'PARTIALLY_REFUNDED']);
 
 export const orderListSchema = listSchema({ status: orderStatus.optional(), paymentStatus: paymentStatus.optional() });
-export const orderStatusSchema = z.strictObject({ status: orderStatus });
+export const orderStatusSchema = z.strictObject({
+  status: orderStatus,
+  note: z.string().trim().max(500).optional(),
+  trackingNumber: z.string().trim().max(100).optional(),
+  carrier: z.string().trim().max(100).optional(),
+});
+
+export const refundSchema = z.strictObject({
+  // Left out for a full refund of whatever remains.
+  amount: moneySchema.refine((value) => Number(value) > 0, 'Enter an amount above zero').optional(),
+  reason: z.string().trim().min(1, 'Add a reason').max(500),
+  reference: z.string().trim().max(255).optional(),
+  restock: z.boolean().default(false),
+});
 
 export const paymentListSchema = listSchema({
   status: paymentStatus.optional(),
-  method: z.enum(['CASH_ON_DELIVERY', 'CARD', 'MOBILE_BANKING', 'BANK_TRANSFER']).optional(),
+  method: z.enum(['CASH_ON_DELIVERY', 'ONLINE', 'CARD', 'MOBILE_BANKING', 'BANK_TRANSFER']).optional(),
+  needsRefund: queryBoolean.optional(),
 });
 export const paymentStatusSchema = z.strictObject({ status: paymentStatus });
 

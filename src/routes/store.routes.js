@@ -36,3 +36,5 @@ orderRoutes.get('/', validate({ query: schemas.customerOrderListSchema }), store
 orderRoutes.post('/', validate({ body: schemas.placeOrderSchema }), store.placeOrder);
 orderRoutes.get('/:id', validate({ params: idParamSchema }), store.getOrder);
 orderRoutes.post('/:id/cancel', validate({ params: idParamSchema }), store.cancelOrder);
+orderRoutes.post('/:id/payments', validate({ params: idParamSchema }), store.startOrderPayment);
+orderRoutes.post('/:id/payments/verify', validate({ params: idParamSchema }), store.checkOrderPayment);

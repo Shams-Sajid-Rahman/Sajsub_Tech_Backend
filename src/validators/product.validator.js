@@ -10,6 +10,7 @@ export const productListQuerySchema = paginationSchema
     minPrice: z.coerce.number().min(0).optional(),
     maxPrice: z.coerce.number().min(0).optional(),
     inStock: queryBoolean.optional(),
+    onSale: queryBoolean.optional(),
     sort: z.enum(['newest', 'oldest', 'price_asc', 'price_desc', 'name', 'rating']).default('newest'),
   })
   .refine(({ minPrice, maxPrice }) => minPrice === undefined || maxPrice === undefined || minPrice <= maxPrice, {

@@ -3,7 +3,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { toSkipTake } from '../utils/pagination.js';
 
 // Customers only see published products in active categories and brands.
-const PUBLIC_WHERE = {
+export const PUBLIC_WHERE = {
   status: 'PUBLISHED',
   category: { isActive: true },
   brand: { isActive: true },
@@ -64,16 +64,20 @@ const priceAtMost = (value) => ({
   OR: [{ discountPrice: { lte: value } }, { discountPrice: null, price: { lte: value } }],
 });
 
-const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock }) => {
+const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock, onSale }) => {
   const conditions = [PUBLIC_WHERE];
   if (search) {
-    conditions.push({
-      OR: [
-        { name: { contains: search, mode: 'insensitive' } },
-        { shortDescription: { contains: search, mode: 'insensitive' } },
-        { brand: { name: { contains: search, mode: 'insensitive' } } },
-      ],
-    });
+    // Every word has to match somewhere, so "sony headphones" finds Sony products in the audio category.
+    for (const word of search.trim().split(/\s+/)) {
+      conditions.push({
+        OR: [
+          { name: { contains: word, mode: 'insensitive' } },
+          { shortDescription: { contains: word, mode: 'insensitive' } },
+          { brand: { name: { contains: word, mode: 'insensitive' } } },
+          { category: { name: { contains: word, mode: 'insensitive' } } },
+        ],
+      });
+    }
   }
   // A parent category also includes products from its subcategories.
   if (category) conditions.push({ category: { OR: [{ slug: category }, { parent: { slug: category } }] } });
@@ -82,6 +86,7 @@ const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inS
   if (minPrice !== undefined) conditions.push(priceAtLeast(minPrice));
   if (maxPrice !== undefined) conditions.push(priceAtMost(maxPrice));
   if (inStock !== undefined) conditions.push({ stockQuantity: inStock ? { gt: 0 } : 0 });
+  if (onSale) conditions.push({ discountPrice: { not: null } });
   return { AND: conditions };
 };
 
