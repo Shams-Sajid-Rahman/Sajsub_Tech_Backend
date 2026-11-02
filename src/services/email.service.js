@@ -10,6 +10,21 @@ const transporter = env.smtp.host
     })
   : null;
 
+export const sendContactEmail = async ({ name, email, subject, message }) => {
+  if (!transporter) {
+    if (env.isProduction) throw new Error('SMTP is not configured, so the contact message was not sent');
+    console.log(`[dev email] Contact message from ${email}: ${subject}`);
+    return;
+  }
+  await transporter.sendMail({
+    from: env.emailFrom,
+    to: env.emailFrom,
+    replyTo: { name, address: email },
+    subject: `Contact form: ${subject}`,
+    text: `From: ${name} <${email}>\n\n${message}`,
+  });
+};
+
 export const sendPasswordResetEmail = async (to, resetUrl) => {
   if (!transporter) {
     if (env.isProduction) throw new Error('SMTP is not configured, so the password reset email was not sent');

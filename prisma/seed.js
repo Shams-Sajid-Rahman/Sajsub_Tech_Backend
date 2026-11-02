@@ -74,6 +74,7 @@ const SETTINGS = [
   { key: 'free_shipping_threshold', value: 50, description: 'Order total for free shipping', isPublic: true },
   { key: 'return_policy_days', value: 30, description: 'Return window in days', isPublic: true },
   { key: 'currency', value: 'USD', description: 'Store currency', isPublic: true },
+  { key: 'shipping_fee', value: 5, description: 'Flat shipping fee below the free shipping threshold', isPublic: true },
 ];
 
 const HERO_BANNER = {
@@ -90,6 +91,16 @@ const ANNOUNCEMENT_BANNERS = [
   { placement: 'ANNOUNCEMENT', title: 'Free Shipping on Orders Over $50!', sortOrder: 0 },
   { placement: 'ANNOUNCEMENT', title: '30% Off This Weekend Only', sortOrder: 1 },
 ];
+
+const FEATURED_CATEGORY_IMAGES = [...CHILD_CATEGORIES.map(({ slug }) => slug), 'fashion-apparel'];
+
+// The design shows four slider dots, so development data has four slides.
+const EXTRA_HERO_SLIDES = ['Great Sound, Smart Tech,', 'Work and Play Better with', 'Fresh Deals Every Day at'].map((title, index) => ({
+  ...HERO_BANNER,
+  title,
+  sortOrder: index + 1,
+  imageUrl: '/images/hero/electronics.png',
+}));
 
 const upsertBySlug = (model, { slug, ...data }) =>
   model.upsert({ where: { slug }, update: data, create: { slug, ...data } });
@@ -171,12 +182,44 @@ const seedBanners = async () => {
   }
 };
 
+// Images cropped from the design reference, served from frontend/public. Records that
+// already have an image keep it, so real uploads are never overwritten.
+const seedDevelopmentImages = async () => {
+  for (const { slug, name } of PRODUCTS) {
+    const product = await prisma.product.findUnique({ where: { slug }, select: { id: true, _count: { select: { images: true } } } });
+    if (product._count.images === 0) {
+      await prisma.productImage.create({
+        data: { productId: product.id, url: `/images/products/${slug}.png`, altText: name, isPrimary: true },
+      });
+    }
+  }
+  for (const slug of FEATURED_CATEGORY_IMAGES) {
+    await prisma.category.updateMany({ where: { slug, imageUrl: null }, data: { imageUrl: `/images/categories/${slug}.png` } });
+  }
+  await prisma.banner.updateMany({ where: { placement: 'HERO', imageUrl: null }, data: { imageUrl: '/images/hero/electronics.png' } });
+  const heroCount = await prisma.banner.count({ where: { placement: 'HERO' } });
+  await prisma.banner.createMany({
+    data: EXTRA_HERO_SLIDES.slice(Math.max(0, heroCount - 1)),
+  });
+  await prisma.siteSetting.upsert({
+    where: { key: 'promo_ends_at' },
+    update: {},
+    create: {
+      key: 'promo_ends_at',
+      value: new Date(Date.now() + 2.5 * 24 * 60 * 60 * 1000).toISOString(),
+      description: 'When the top bar countdown ends',
+      isPublic: true,
+    },
+  });
+};
+
 try {
   const categoryIds = await seedCategories();
   const brandIds = await seedBrands();
   await seedProducts(categoryIds, brandIds);
   await seedSettings();
   await seedBanners();
+  await seedDevelopmentImages();
   const { email, created } = await createAdmin(prisma);
   console.log(`Seed complete. Admin ${created ? 'created' : 'already exists'}: ${email}`);
 } catch (error) {

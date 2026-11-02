@@ -131,7 +131,7 @@ test('invalid slugs return 400', async () => {
 });
 
 test('every route group is mounted', async () => {
-  for (const group of ['users', 'inventory', 'cart', 'wishlist', 'orders', 'payments', 'ai']) {
+  for (const group of ['users', 'inventory', 'payments', 'ai']) {
     const res = await request(app).get(`/api/${group}`);
     assert.equal(res.status, 501, group);
     assert.equal(res.body.success, false);

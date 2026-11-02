@@ -10,20 +10,27 @@ const PUBLIC_WHERE = {
 };
 
 const LIST_INCLUDE = {
-  category: { select: { name: true, slug: true } },
-  brand: { select: { name: true, slug: true } },
+  category: { select: { name: true, slug: true, isActive: true } },
+  brand: { select: { name: true, slug: true, isActive: true } },
   images: { where: { isPrimary: true }, take: 1 },
 };
 
 const SORTS = {
   newest: [{ createdAt: 'desc' }, { id: 'asc' }],
+  oldest: [{ createdAt: 'asc' }, { id: 'asc' }],
   name: [{ name: 'asc' }, { id: 'asc' }],
   rating: [{ ratingAverage: 'desc' }, { ratingCount: 'desc' }, { id: 'asc' }],
 };
 
 const effectivePrice = ({ price, discountPrice }) => discountPrice ?? price;
 
-const toPublicProduct = ({ images, stockQuantity, ...product }) => {
+export const CARD_INCLUDE = LIST_INCLUDE;
+
+// Publication and stock are separate: an out-of-stock product can stay visible.
+export const isPurchasable = ({ status, category, brand }) =>
+  status === 'PUBLISHED' && category.isActive && brand.isActive;
+
+export const toPublicProduct = ({ images, stockQuantity, ...product }) => {
   const salePrice = effectivePrice(product);
   return {
     id: product.id,
@@ -42,8 +49,9 @@ const toPublicProduct = ({ images, stockQuantity, ...product }) => {
     isFeatured: product.isFeatured,
     ratingAverage: product.ratingAverage.toNumber(),
     ratingCount: product.ratingCount,
-    category: product.category,
-    brand: product.brand,
+    category: { name: product.category.name, slug: product.category.slug },
+    brand: { name: product.brand.name, slug: product.brand.slug },
+    stockLeft: stockQuantity > 0 && stockQuantity <= product.lowStockAlert ? stockQuantity : null,
     primaryImage: images[0] ? { url: images[0].url, altText: images[0].altText } : null,
   };
 };
@@ -56,7 +64,7 @@ const priceAtMost = (value) => ({
   OR: [{ discountPrice: { lte: value } }, { discountPrice: null, price: { lte: value } }],
 });
 
-const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice }) => {
+const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock }) => {
   const conditions = [PUBLIC_WHERE];
   if (search) {
     conditions.push({
@@ -73,6 +81,7 @@ const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice }) =
   if (featured !== undefined) conditions.push({ isFeatured: featured });
   if (minPrice !== undefined) conditions.push(priceAtLeast(minPrice));
   if (maxPrice !== undefined) conditions.push(priceAtMost(maxPrice));
+  if (inStock !== undefined) conditions.push({ stockQuantity: inStock ? { gt: 0 } : 0 });
   return { AND: conditions };
 };
 
@@ -108,6 +117,28 @@ export const listProducts = async (query) => {
     prisma.product.count({ where }),
   ]);
   return { products: products.map(toPublicProduct), total };
+};
+
+const RELATED_LIMIT = 6;
+
+export const getRelatedProducts = async (slug) => {
+  const product = await prisma.product.findFirst({
+    where: { ...PUBLIC_WHERE, slug },
+    select: { id: true, categoryId: true, category: { select: { parentId: true } } },
+  });
+  if (!product) throw new ApiError(404, 'Product not found');
+  const { parentId } = product.category;
+  const related = await prisma.product.findMany({
+    where: {
+      ...PUBLIC_WHERE,
+      id: { not: product.id },
+      OR: [{ categoryId: product.categoryId }, ...(parentId ? [{ category: { isActive: true, parentId } }] : [])],
+    },
+    include: LIST_INCLUDE,
+    orderBy: [{ ratingAverage: 'desc' }, { id: 'asc' }],
+    take: RELATED_LIMIT,
+  });
+  return related.map(toPublicProduct);
 };
 
 export const getProductBySlug = async (slug) => {
