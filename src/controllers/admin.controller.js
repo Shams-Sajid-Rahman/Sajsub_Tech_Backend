@@ -1,6 +1,7 @@
 import { adjustStock } from '../services/inventory.service.js';
 import * as catalog from '../services/admin/catalog.service.js';
 import * as content from '../services/admin/content.service.js';
+import * as images from '../services/admin/image.service.js';
 import * as logs from '../services/admin/log.service.js';
 import * as orders from '../services/admin/order.service.js';
 import * as products from '../services/admin/product.service.js';
@@ -26,13 +27,23 @@ const audited = (action, entityType, run, { status = 200, message = 'Saved' } = 
     await logs.logAudit({
       actorId: req.user.id,
       ipAddress: req.ip,
-      action,
+      action: typeof action === 'function' ? action(result) : action,
       entityType,
       entityId: String(result?.id ?? result?.key ?? req.params.id ?? req.params.key ?? ''),
       changes: req.validated?.body,
     });
-    sendSuccess(res, result, { status, message });
+    sendSuccess(res, result, { status, message: typeof message === 'function' ? message(result) : message });
   };
+
+// Deleting reports what actually happened, because records with history are archived instead.
+const removed = (entity, entityType, run) =>
+  audited(({ outcome }) => `${entity}.${outcome}`, entityType, run, {
+    message: ({ outcome }) =>
+      outcome === 'deleted' ? `${entityType} deleted` : `${entityType} archived, because it has linked records`,
+  });
+
+const uploadedFiles = (req) => req.files;
+const imageId = (req) => req.validated.params.imageId;
 
 const CREATED = { status: 201, message: 'Created' };
 const body = (req) => req.validated.body;
@@ -50,17 +61,38 @@ export const getProducts = list(products.listAdminProducts);
 export const getProduct = read((req) => products.getAdminProduct(id(req)));
 export const createProduct = audited('product.created', 'Product', (req) => products.createProduct(body(req), req.user.id), CREATED);
 export const updateProduct = audited('product.updated', 'Product', (req) => products.updateProduct(id(req), body(req)));
-export const archiveProduct = audited('product.archived', 'Product', (req) => products.archiveProduct(id(req)), { message: 'Archived' });
+export const deleteProduct = removed('product', 'Product', (req) => products.deleteProduct(id(req)));
+export const addProductImages = audited(
+  'product.images_added',
+  'Product',
+  async (req) => ({ id: id(req), images: await images.addProductImages(id(req), uploadedFiles(req)) }),
+  { status: 201, message: 'Images uploaded' },
+);
+export const replaceProductImage = audited('product.image_replaced', 'ProductImage', (req) =>
+  images.replaceProductImage(id(req), imageId(req), req.file),
+);
+export const setPrimaryProductImage = audited('product.image_primary_set', 'ProductImage', (req) =>
+  images.setPrimaryProductImage(id(req), imageId(req)),
+);
+export const deleteProductImage = audited('product.image_deleted', 'ProductImage', (req) =>
+  images.deleteProductImage(id(req), imageId(req)), { message: 'Image deleted' },
+);
 
 export const getCategories = list(catalog.listAdminCategories);
 export const createCategory = audited('category.created', 'Category', (req) => catalog.createCategory(body(req)), CREATED);
 export const updateCategory = audited('category.updated', 'Category', (req) => catalog.updateCategory(id(req), body(req)));
-export const archiveCategory = audited('category.archived', 'Category', (req) => catalog.archiveCategory(id(req)), { message: 'Archived' });
+export const deleteCategory = removed('category', 'Category', (req) => catalog.deleteCategory(id(req)));
+export const setCategoryImage = audited('category.image_set', 'Category', (req) =>
+  images.setCategoryImage(id(req), req.file), { message: 'Image uploaded' },
+);
+export const removeCategoryImage = audited('category.image_removed', 'Category', (req) =>
+  images.removeCategoryImage(id(req)), { message: 'Image removed' },
+);
 
 export const getBrands = list(catalog.listAdminBrands);
 export const createBrand = audited('brand.created', 'Brand', (req) => catalog.createBrand(body(req)), CREATED);
 export const updateBrand = audited('brand.updated', 'Brand', (req) => catalog.updateBrand(id(req), body(req)));
-export const archiveBrand = audited('brand.archived', 'Brand', (req) => catalog.archiveBrand(id(req)), { message: 'Archived' });
+export const deleteBrand = removed('brand', 'Brand', (req) => catalog.deleteBrand(id(req)));
 
 export const getInventory = list(logs.listInventoryTransactions);
 export const adjustInventory = audited(

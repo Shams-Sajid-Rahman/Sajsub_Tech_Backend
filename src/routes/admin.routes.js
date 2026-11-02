@@ -4,6 +4,7 @@ import * as auth from '../controllers/auth.controller.js';
 import { requireAdmin } from '../middleware/auth.middleware.js';
 import { notFound } from '../middleware/error.middleware.js';
 import { loginLimiter } from '../middleware/rateLimit.middleware.js';
+import { uploadImageField, uploadImagesField } from '../middleware/upload.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import * as schemas from '../validators/admin.validator.js';
 import { changePasswordSchema, loginSchema, updateProfileSchema } from '../validators/auth.validator.js';
@@ -12,6 +13,7 @@ const router = Router();
 
 const byId = { params: schemas.idParamSchema };
 const byKey = { params: schemas.settingKeyParamSchema };
+const byImage = { params: schemas.productImageParamSchema };
 
 router.post('/auth/login', loginLimiter, validate({ body: loginSchema }), auth.adminLogin);
 router.post('/auth/logout', auth.logout);
@@ -33,17 +35,23 @@ router.get('/products', validate({ query: schemas.adminProductListSchema }), adm
 router.post('/products', validate({ body: schemas.productCreateSchema }), admin.createProduct);
 router.get('/products/:id', validate(byId), admin.getProduct);
 router.patch('/products/:id', validate({ ...byId, body: schemas.productUpdateSchema }), admin.updateProduct);
-router.delete('/products/:id', validate(byId), admin.archiveProduct);
+router.delete('/products/:id', validate(byId), admin.deleteProduct);
+router.post('/products/:id/images', validate(byId), uploadImagesField, admin.addProductImages);
+router.put('/products/:id/images/:imageId', validate(byImage), uploadImageField, admin.replaceProductImage);
+router.patch('/products/:id/images/:imageId/primary', validate(byImage), admin.setPrimaryProductImage);
+router.delete('/products/:id/images/:imageId', validate(byImage), admin.deleteProductImage);
 
 router.get('/categories', validate({ query: schemas.adminCatalogListSchema }), admin.getCategories);
 router.post('/categories', validate({ body: schemas.categoryCreateSchema }), admin.createCategory);
 router.patch('/categories/:id', validate({ ...byId, body: schemas.categoryUpdateSchema }), admin.updateCategory);
-router.delete('/categories/:id', validate(byId), admin.archiveCategory);
+router.delete('/categories/:id', validate(byId), admin.deleteCategory);
+router.put('/categories/:id/image', validate(byId), uploadImageField, admin.setCategoryImage);
+router.delete('/categories/:id/image', validate(byId), admin.removeCategoryImage);
 
 router.get('/brands', validate({ query: schemas.adminCatalogListSchema }), admin.getBrands);
 router.post('/brands', validate({ body: schemas.brandCreateSchema }), admin.createBrand);
 router.patch('/brands/:id', validate({ ...byId, body: schemas.brandUpdateSchema }), admin.updateBrand);
-router.delete('/brands/:id', validate(byId), admin.archiveBrand);
+router.delete('/brands/:id', validate(byId), admin.deleteBrand);
 
 router.get('/inventory', validate({ query: schemas.inventoryListSchema }), admin.getInventory);
 router.post('/inventory/adjust', validate({ body: schemas.inventoryAdjustSchema }), admin.adjustInventory);

@@ -166,19 +166,20 @@ model LoginLog {
 // ---------- Product management ----------
 
 model Category {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  parentId    String?  @db.Uuid
-  name        String   @db.VarChar(120)
-  slug        String   @unique @db.VarChar(140)
-  description String?
-  icon        String?  @db.VarChar(60)
-  imageUrl    String?  @db.VarChar(500)
-  sortOrder   Int      @default(0)
-  showInMenu  Boolean  @default(false) // "All Categories" sidebar
-  isFeatured  Boolean  @default(false) // "Shop by Category" row
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  parentId      String?  @db.Uuid
+  name          String   @db.VarChar(120)
+  slug          String   @unique @db.VarChar(140)
+  description   String?
+  icon          String?  @db.VarChar(60)
+  imageUrl      String?  @db.VarChar(500)
+  imagePublicId String?  @db.VarChar(255)
+  sortOrder     Int      @default(0)
+  showInMenu    Boolean  @default(false) // "All Categories" sidebar
+  isFeatured    Boolean  @default(false) // "Shop by Category" row
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
   children Category[] @relation("CategoryTree")

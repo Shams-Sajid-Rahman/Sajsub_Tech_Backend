@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { toSkipTake } from '../../utils/pagination.js';
 import { slugify } from '../../utils/slug.js';
+import { destroyImages } from '../cloudinary.service.js';
 
 const listActivable = async (model, { search, isActive, ...pagination }, options) => {
   const where = {
@@ -40,7 +41,21 @@ export const updateCategory = async (id, data) => {
   return prisma.category.update({ where: { id }, data });
 };
 
-export const archiveCategory = (id) => prisma.category.update({ where: { id }, data: { isActive: false } });
+export const deleteCategory = async (id) => {
+  const category = await prisma.category.findUnique({
+    where: { id },
+    select: { imagePublicId: true, _count: { select: { products: true, children: true } } },
+  });
+  if (!category) throw new ApiError(404, 'Category not found');
+
+  if (category._count.products > 0 || category._count.children > 0) {
+    await prisma.category.update({ where: { id }, data: { isActive: false } });
+    return { id, outcome: 'archived' };
+  }
+  await prisma.category.delete({ where: { id } });
+  await destroyImages([category.imagePublicId]);
+  return { id, outcome: 'deleted' };
+};
 
 // ---------- Brands ----------
 
@@ -54,4 +69,17 @@ export const createBrand = (data) => prisma.brand.create({ data: { ...data, slug
 
 export const updateBrand = (id, data) => prisma.brand.update({ where: { id }, data });
 
-export const archiveBrand = (id) => prisma.brand.update({ where: { id }, data: { isActive: false } });
+export const deleteBrand = async (id) => {
+  const brand = await prisma.brand.findUnique({
+    where: { id },
+    select: { _count: { select: { products: true } } },
+  });
+  if (!brand) throw new ApiError(404, 'Brand not found');
+
+  if (brand._count.products > 0) {
+    await prisma.brand.update({ where: { id }, data: { isActive: false } });
+    return { id, outcome: 'archived' };
+  }
+  await prisma.brand.delete({ where: { id } });
+  return { id, outcome: 'deleted' };
+};

@@ -115,18 +115,14 @@ test('products: create, edit, filter, archive, and no direct stock edits', async
   const created = await newProduct('crud', {
     initialStock: 10,
     status: 'PUBLISHED',
-    images: [{ url: 'https://example.com/a.png' }, { url: 'https://example.com/b.png' }],
     specifications: [{ name: 'Color', value: 'Blue' }],
   });
   assert.equal(created.status, 201);
   const product = created.body.data;
   assert.equal(product.stockQuantity, 10);
-  assert.equal(product.images[0].isPrimary, true);
-  assert.equal(product.images[1].isPrimary, false);
 
-  const edit = await admin.patch(`/api/admin/products/${product.id}`, { price: '80.00', images: [{ url: 'https://example.com/c.png' }] });
+  const edit = await admin.patch(`/api/admin/products/${product.id}`, { price: '80.00' });
   assert.equal(edit.body.data.price, '80');
-  assert.equal(edit.body.data.images.length, 1);
   assert.equal(edit.body.data.publishedAt, product.publishedAt);
 
   const resaved = await admin.patch(`/api/admin/products/${product.id}`, { status: 'PUBLISHED' });
@@ -147,7 +143,7 @@ test('products: create, edit, filter, archive, and no direct stock edits', async
 test('validation rejects bad input, including script URLs', async () => {
   assert.equal((await newProduct('bad', { price: '-5' })).status, 400);
   assert.equal((await newProduct('badd', { discountPrice: '200.00' })).status, 400);
-  assert.equal((await newProduct('badi', { images: [{ url: 'javascript:alert(1)' }] })).status, 400);
+  assert.equal((await newProduct('badi', { images: [{ url: 'https://example.com/a.png' }] })).status, 400);
   assert.equal((await admin.post('/api/admin/banners', { title: 'x', linkUrl: 'javascript:alert(1)' })).status, 400);
   assert.equal((await admin.post('/api/admin/banners', { title: 'x', linkUrl: '//evil.example' })).status, 400);
   assert.equal((await admin.get('/api/admin/products/not-a-uuid')).status, 400);
@@ -163,11 +159,56 @@ test('duplicates return 409, and categories cannot nest inside themselves', asyn
   assert.equal(cycle.status, 400);
 });
 
-test('archiving a brand hides it publicly but keeps it', async () => {
-  const extra = (await admin.post('/api/admin/brands', { name: `${tag} Old` })).body.data;
-  assert.equal((await admin.delete(`/api/admin/brands/${extra.id}`)).status, 200);
-  assert.equal((await request(app).get(`/api/brands/${extra.slug}`)).status, 404);
-  assert.equal((await prisma.brand.findUnique({ where: { id: extra.id } })).isActive, false);
+test('deleting a brand removes it when unused, and archives it when it has products', async () => {
+  const unused = (await admin.post('/api/admin/brands', { name: `${tag} Unused` })).body.data;
+  const gone = await admin.delete(`/api/admin/brands/${unused.id}`);
+  assert.equal(gone.body.data.outcome, 'deleted');
+  assert.equal(await prisma.brand.count({ where: { id: unused.id } }), 0);
+
+  const used = (await admin.post('/api/admin/brands', { name: `${tag} Used` })).body.data;
+  await newProduct('branded', { brandId: used.id });
+  const kept = await admin.delete(`/api/admin/brands/${used.id}`);
+  assert.equal(kept.body.data.outcome, 'archived');
+  assert.equal((await prisma.brand.findUnique({ where: { id: used.id } })).isActive, false);
+  assert.equal((await request(app).get(`/api/brands/${used.slug}`)).status, 404);
+
+  const products = await admin.get('/api/admin/products').query({ brandId: used.id });
+  assert.equal(products.body.meta.total, 1);
+});
+
+test('deleting a category removes it when unused, and archives it when it has products', async () => {
+  const unused = (await admin.post('/api/admin/categories', { name: `${tag} Empty` })).body.data;
+  assert.equal((await admin.delete(`/api/admin/categories/${unused.id}`)).body.data.outcome, 'deleted');
+  assert.equal(await prisma.category.count({ where: { id: unused.id } }), 0);
+
+  const used = (await admin.post('/api/admin/categories', { name: `${tag} Full` })).body.data;
+  await newProduct('categorized', { categoryId: used.id });
+  assert.equal((await admin.delete(`/api/admin/categories/${used.id}`)).body.data.outcome, 'archived');
+  assert.equal((await prisma.category.findUnique({ where: { id: used.id } })).isActive, false);
+});
+
+test('deleting a product removes it only when it has no stock or order history', async () => {
+  const clean = (await newProduct('clean')).body.data;
+  const removed = await admin.delete(`/api/admin/products/${clean.id}`);
+  assert.equal(removed.body.data.outcome, 'deleted');
+  assert.equal(await prisma.product.count({ where: { id: clean.id } }), 0);
+
+  const stocked = (await newProduct('stocked', { initialStock: 1 })).body.data;
+  const archived = await admin.delete(`/api/admin/products/${stocked.id}`);
+  assert.equal(archived.body.data.outcome, 'archived');
+  assert.equal(await prisma.inventoryTransaction.count({ where: { productId: stocked.id } }), 1);
+});
+
+test('publication is separate from stock', async () => {
+  const product = (await newProduct('pub', { status: 'PUBLISHED' })).body.data;
+  const outOfStock = await request(app).get(`/api/products/${product.slug}`);
+  assert.equal(outOfStock.status, 200);
+  assert.equal(outOfStock.body.data.inStock, false);
+
+  await admin.post('/api/admin/inventory/adjust', { productId: product.id, quantityChange: 3, type: 'RESTOCK', note: 'Test' });
+  const unpublished = await admin.patch(`/api/admin/products/${product.id}`, { status: 'DRAFT' });
+  assert.equal(unpublished.body.data.stockQuantity, 3);
+  assert.equal((await request(app).get(`/api/products/${product.slug}`)).status, 404);
 });
 
 test('inventory adjustments update stock, keep history and refuse overselling', async () => {

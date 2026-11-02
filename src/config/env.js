@@ -18,6 +18,9 @@ const schema = z
     SMTP_USER: optionalText,
     SMTP_PASS: optionalText,
     EMAIL_FROM: optionalText,
+    CLOUDINARY_CLOUD_NAME: optionalText,
+    CLOUDINARY_API_KEY: optionalText,
+    CLOUDINARY_API_SECRET: optionalText,
   })
   .refine(({ JWT_SECRET, CSRF_SECRET }) => JWT_SECRET !== CSRF_SECRET, {
     path: ['CSRF_SECRET'],
@@ -47,4 +50,9 @@ export const env = {
   cookieSameSite: data.COOKIE_SAMESITE,
   smtp: { host: data.SMTP_HOST, port: data.SMTP_PORT, user: data.SMTP_USER, pass: data.SMTP_PASS },
   emailFrom: data.EMAIL_FROM,
+  cloudinary: {
+    cloudName: data.CLOUDINARY_CLOUD_NAME,
+    apiKey: data.CLOUDINARY_API_KEY,
+    apiSecret: data.CLOUDINARY_API_SECRET,
+  },
 };

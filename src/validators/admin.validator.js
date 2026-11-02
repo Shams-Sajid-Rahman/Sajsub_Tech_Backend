@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { paginationSchema, queryBoolean } from './common.validator.js';
 
 export const idParamSchema = z.object({ id: z.uuid('Invalid id') });
+export const productImageParamSchema = z.object({ id: z.uuid('Invalid id'), imageId: z.uuid('Invalid id') });
 
 const search = z.string().trim().min(1).max(100).optional();
 const moneySchema = z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, 'Enter a valid amount, such as 19.99');
@@ -32,10 +33,9 @@ export const adminProductListSchema = listSchema({
   stock: z.enum(['in', 'low', 'out']).optional(),
 });
 
-const imageSchema = z.strictObject({ url: httpUrl, altText: optionalText(255) });
 const specificationSchema = z.strictObject({
-  name: z.string().trim().min(1).max(120),
-  value: z.string().trim().min(1).max(500),
+  name: z.string().trim().min(1, 'Each specification needs a name, as Name: Value').max(120),
+  value: z.string().trim().min(1, 'Each specification needs a value, as Name: Value').max(500),
 });
 
 const productFields = {
@@ -50,7 +50,6 @@ const productFields = {
   lowStockAlert: z.coerce.number().int().min(0).max(100000).optional(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
   isFeatured: z.boolean().optional(),
-  images: z.array(imageSchema).max(20).optional(),
   specifications: z.array(specificationSchema).max(50).optional(),
 };
 
@@ -87,7 +86,6 @@ const categoryFields = {
   parentId: z.uuid().nullable(),
   description: optionalText(5000),
   icon: optionalText(60),
-  imageUrl: httpUrl.nullable(),
   sortOrder: z.coerce.number().int().min(0).max(100000),
   showInMenu: z.boolean(),
   isFeatured: z.boolean(),
