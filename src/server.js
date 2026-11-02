@@ -2,8 +2,11 @@ import app from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
 
-if (!env.databaseUrl) {
-  console.error('DATABASE_URL is not set. Copy backend/.env.example to backend/.env and fill it in.');
+try {
+  await prisma.$connect();
+} catch (error) {
+  console.error('Could not connect to PostgreSQL. Check DATABASE_URL in backend/.env.');
+  console.error(error.message);
   process.exit(1);
 }
 

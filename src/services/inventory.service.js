@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { ApiError } from '../utils/ApiError.js';
 
 const applyStockChange = async (tx, { productId, quantityChange, type, orderId, performedById, note }) => {
   // The stock condition and update are one atomic statement, so concurrent sales can't oversell.
@@ -12,9 +13,7 @@ const applyStockChange = async (tx, { productId, quantityChange, type, orderId, 
 
   if (count === 0) {
     const exists = await tx.product.findUnique({ where: { id: productId }, select: { id: true } });
-    const error = new Error(exists ? 'Insufficient stock' : 'Product not found');
-    error.status = exists ? 409 : 404;
-    throw error;
+    throw exists ? new ApiError(409, 'Insufficient stock') : new ApiError(404, 'Product not found');
   }
 
   const { stockQuantity: stockAfter } = await tx.product.findUniqueOrThrow({

@@ -99,6 +99,7 @@ model User {
   updatedAt     DateTime   @updatedAt @db.Timestamptz(6)
 
   sessions              UserSession[]
+  passwordResetTokens   PasswordResetToken[]
   loginLogs             LoginLog[]
   addresses             Address[]
   cart                  Cart?
@@ -128,6 +129,21 @@ model UserSession {
   @@index([userId])
   @@index([expiresAt])
   @@map("user_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique @db.VarChar(64)
+  expiresAt DateTime  @db.Timestamptz(6)
+  usedAt    DateTime? @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model LoginLog {

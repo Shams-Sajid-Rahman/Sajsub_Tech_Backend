@@ -1,7 +1,8 @@
 import { checkDatabase } from '../services/health.service.js';
+import { sendError, sendSuccess } from '../utils/response.js';
 
 export const getHealth = (req, res) => {
-  res.json({
+  sendSuccess(res, {
     status: 'ok',
     service: 'sajsub-tech-api',
     uptime: process.uptime(),
@@ -12,10 +13,10 @@ export const getHealth = (req, res) => {
 export const getDatabaseHealth = async (req, res) => {
   try {
     await checkDatabase();
-    res.json({ status: 'ok', database: 'connected' });
+    sendSuccess(res, { status: 'ok', database: 'connected' });
   } catch (error) {
     // Details stay in the server log: Prisma errors can reveal connection info.
     console.error('Database health check failed:', error.message);
-    res.status(503).json({ status: 'error', database: 'unavailable' });
+    sendError(res, 503, 'Database unavailable');
   }
 };
