@@ -2,6 +2,7 @@ import * as addresses from '../services/address.service.js';
 import * as cart from '../services/cart.service.js';
 import * as orders from '../services/customerOrder.service.js';
 import { sendContactEmail } from '../services/email.service.js';
+import { subscribeToNewsletter } from '../services/newsletter.service.js';
 import * as products from '../services/product.service.js';
 import * as reviews from '../services/review.service.js';
 import { getSiteContent } from '../services/site.service.js';
@@ -54,6 +55,13 @@ export const startOrderPayment = async (req, res) =>
   sendSuccess(res, await orders.startOrderPayment(req.user.id, req.validated.params.id), { status: 201 });
 export const checkOrderPayment = async (req, res) =>
   sendSuccess(res, await orders.checkOrderPayment(req.user.id, req.validated.params.id));
+
+export const getBestSellers = async (req, res) => sendSuccess(res, await products.listBestSellers(req.validated.query));
+export const getLatestReviews = async (req, res) => sendSuccess(res, await reviews.listLatestReviews(req.validated.query));
+export const subscribeNewsletter = async (req, res) => {
+  await subscribeToNewsletter(body(req));
+  sendSuccess(res, null, { message: 'Thanks for subscribing!' });
+};
 
 export const getRelatedProducts = async (req, res) => sendSuccess(res, await products.getRelatedProducts(slug(req)));
 export const getReviews = async (req, res) => {

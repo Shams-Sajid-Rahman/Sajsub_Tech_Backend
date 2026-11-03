@@ -58,6 +58,14 @@ export const aiMessageSchema = z.strictObject({
   conversationId: z.uuid().optional(),
 });
 
+export const newsletterSchema = z.strictObject({
+  email: z.string().trim().toLowerCase().pipe(z.email('Enter a valid email address').max(255)),
+});
+
+export const latestReviewsSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(12).default(6),
+});
+
 export const contactSchema = z.strictObject({
   name: required(120),
   email: z.string().trim().toLowerCase().pipe(z.email('Enter a valid email address').max(255)),

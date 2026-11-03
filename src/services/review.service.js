@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { ApiError } from '../utils/ApiError.js';
+import { PUBLIC_WHERE } from './product.service.js';
 import { toSkipTake } from '../utils/pagination.js';
 
 const findPublishedId = async (slug) => {
@@ -28,6 +29,29 @@ export const listReviews = async (slug, pagination) => {
     author: `${user.firstName} ${user.lastName[0]}.`,
   }));
   return { items, total };
+};
+
+const GOOD_RATING = 4;
+
+// Recent good reviews with a written comment, for the homepage.
+export const listLatestReviews = async ({ limit }) => {
+  const rows = await prisma.review.findMany({
+    where: { rating: { gte: GOOD_RATING }, AND: [{ comment: { not: null } }, { comment: { not: '' } }], product: PUBLIC_WHERE },
+    include: {
+      user: { select: { firstName: true, lastName: true } },
+      product: { select: { name: true, slug: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+  return rows.map(({ id, rating, comment, createdAt, user, product }) => ({
+    id,
+    rating,
+    comment,
+    createdAt,
+    author: `${user.firstName} ${user.lastName[0]}.`,
+    product,
+  }));
 };
 
 // Only customers who received the product can review it, and a second review replaces the first.

@@ -64,7 +64,7 @@ const priceAtMost = (value) => ({
   OR: [{ discountPrice: { lte: value } }, { discountPrice: null, price: { lte: value } }],
 });
 
-const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock, onSale }) => {
+const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock, onSale, slugs }) => {
   const conditions = [PUBLIC_WHERE];
   if (search) {
     // Every word has to match somewhere, so "sony headphones" finds Sony products in the audio category.
@@ -87,6 +87,7 @@ const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inS
   if (maxPrice !== undefined) conditions.push(priceAtMost(maxPrice));
   if (inStock !== undefined) conditions.push({ stockQuantity: inStock ? { gt: 0 } : 0 });
   if (onSale) conditions.push({ discountPrice: { not: null } });
+  if (slugs) conditions.push({ slug: { in: slugs } });
   return { AND: conditions };
 };
 
@@ -122,6 +123,24 @@ export const listProducts = async (query) => {
     prisma.product.count({ where }),
   ]);
   return { products: products.map(toPublicProduct), total };
+};
+
+// Orders that really went ahead. Unpaid, cancelled and refunded orders are not sales.
+const NOT_A_SALE = ['PENDING', 'CANCELLED', 'REFUNDED'];
+
+// Only products that have actually sold, so the list is empty until there are real sales.
+export const listBestSellers = async ({ limit }) => {
+  const sold = await prisma.orderItem.groupBy({
+    by: ['productId'],
+    where: { order: { status: { notIn: NOT_A_SALE } }, product: PUBLIC_WHERE },
+    _sum: { quantity: true },
+    orderBy: [{ _sum: { quantity: 'desc' } }, { productId: 'asc' }],
+    take: limit,
+  });
+  const ids = sold.map(({ productId }) => productId);
+  const products = await prisma.product.findMany({ where: { id: { in: ids } }, include: LIST_INCLUDE });
+  const byId = new Map(products.map((product) => [product.id, product]));
+  return ids.map((id) => toPublicProduct(byId.get(id)));
 };
 
 const RELATED_LIMIT = 6;
