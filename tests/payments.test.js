@@ -585,8 +585,8 @@ test('revenue subtracts refunds and leaves out money waiting to be refunded', as
 test('customers cannot reach refunds or provider checks', async () => {
   const { order } = await placeOrder('CASH_ON_DELIVERY');
   const paymentId = order.payments[0].id;
-  assert.equal((await buyer.post(`/api/admin/payments/${paymentId}/refunds`, { reason: 'x' })).status, 403);
-  assert.equal((await buyer.post(`/api/admin/payments/${paymentId}/verify`)).status, 403);
+  assert.equal((await buyer.post(`/api/admin/payments/${paymentId}/refunds`, { reason: 'x' })).status, 401);
+  assert.equal((await buyer.post(`/api/admin/payments/${paymentId}/verify`)).status, 401);
 });
 
 // ---------- The real provider client, with the network replaced ----------

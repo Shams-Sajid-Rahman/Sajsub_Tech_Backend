@@ -21,11 +21,11 @@ const findLoginFailure = (user, passwordMatches, portal) => {
   if (!user) return 'UNKNOWN_EMAIL';
   if (!passwordMatches) return 'WRONG_PASSWORD';
   if (user.status !== 'ACTIVE') return 'ACCOUNT_INACTIVE';
-  if (user.role !== portal) return 'WRONG_LOGIN_PORTAL';
+  if (portal === 'ADMIN' && user.role !== 'ADMIN') return 'WRONG_LOGIN_PORTAL';
   return null;
 };
 
-// Admins and customers each log in through their own endpoint. Every failure returns
+// Anyone can log in to the store, but only admins to the dashboard. Every failure returns
 // the same message, and the real reason only goes to the login log.
 export const login = async ({ email, password }, portal, context) => {
   const user = await prisma.user.findUnique({ where: { email } });

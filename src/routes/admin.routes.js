@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as admin from '../controllers/admin.controller.js';
 import * as auth from '../controllers/auth.controller.js';
-import { requireAdmin } from '../middleware/auth.middleware.js';
+import { optionalAdminAuthenticate, requireAdmin } from '../middleware/auth.middleware.js';
 import { notFound } from '../middleware/error.middleware.js';
 import { loginLimiter } from '../middleware/rateLimit.middleware.js';
 import { uploadImageField, uploadImagesField } from '../middleware/upload.middleware.js';
@@ -16,7 +16,9 @@ const byKey = { params: schemas.settingKeyParamSchema };
 const byImage = { params: schemas.productImageParamSchema };
 
 router.post('/auth/login', loginLimiter, validate({ body: loginSchema }), auth.adminLogin);
-router.post('/auth/logout', auth.logout);
+router.post('/auth/logout', auth.adminLogout);
+router.post('/auth/refresh', auth.adminRefresh);
+router.get('/auth/session', optionalAdminAuthenticate, auth.getAdminSession);
 
 // Every route below this line requires an admin session.
 router.use(requireAdmin);

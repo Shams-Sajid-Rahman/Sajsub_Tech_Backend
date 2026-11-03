@@ -30,6 +30,18 @@ const getDailySales = async () => {
   });
 };
 
+// Orders that really went ahead. Unpaid, cancelled and refunded orders are not sales.
+const getTopProducts = async () => {
+  const rows = await prisma.orderItem.groupBy({
+    by: ['productId', 'productName'],
+    where: { order: { status: { notIn: ['PENDING', 'CANCELLED', 'REFUNDED'] } } },
+    _sum: { quantity: true, lineTotal: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+    take: 5,
+  });
+  return rows.map(({ productId, productName, _sum }) => ({ id: productId, name: productName, sold: _sum.quantity, revenue: _sum.lineTotal.toFixed(2) }));
+};
+
 export const getDashboardStats = async () => {
   const [
     totalCustomers,
@@ -43,6 +55,9 @@ export const getDashboardStats = async () => {
     statusGroups,
     dailySales,
     recentOrders,
+    topProducts,
+    newCustomers,
+    stockAlerts,
   ] = await Promise.all([
     prisma.user.count({ where: { role: 'CUSTOMER', status: { not: 'DELETED' } } }),
     prisma.product.count({ where: NOT_ARCHIVED }),
@@ -66,6 +81,19 @@ export const getDashboardStats = async () => {
         user: { select: { firstName: true, lastName: true } },
       },
     }),
+    getTopProducts(),
+    prisma.user.findMany({
+      where: { role: 'CUSTOMER', status: { not: 'DELETED' } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, firstName: true, lastName: true, createdAt: true, lastLoginAt: true },
+    }),
+    prisma.product.findMany({
+      where: { OR: [OUT_OF_STOCK, lowStockWhere()] },
+      orderBy: { stockQuantity: 'asc' },
+      take: 5,
+      select: { id: true, name: true, stockQuantity: true },
+    }),
   ]);
 
   return {
@@ -82,6 +110,9 @@ export const getDashboardStats = async () => {
     dailySales,
     ordersByStatus: statusGroups.map(({ status, _count }) => ({ status, count: _count._all })),
     recentOrders,
+    topProducts,
+    newCustomers,
+    stockAlerts,
   };
 };
 

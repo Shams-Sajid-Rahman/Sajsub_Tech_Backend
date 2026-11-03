@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { getProduct, getProducts } from '../controllers/product.controller.js';
 import { getBestSellers, getRelatedProducts, getReviews, saveReview } from '../controllers/store.controller.js';
-import { authenticate, requireRole } from '../middleware/auth.middleware.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { slugParamSchema } from '../validators/common.validator.js';
 import { bestSellersQuerySchema, productListQuerySchema } from '../validators/product.validator.js';
@@ -17,7 +17,6 @@ router.get('/:slug/reviews', validate({ params: slugParamSchema, query: reviewLi
 router.put(
   '/:slug/reviews',
   authenticate,
-  requireRole('CUSTOMER'),
   validate({ params: slugParamSchema, body: reviewSchema }),
   saveReview,
 );

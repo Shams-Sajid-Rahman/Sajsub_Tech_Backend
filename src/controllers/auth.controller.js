@@ -1,7 +1,16 @@
 import { issueCsrfToken } from '../middleware/csrf.middleware.js';
 import * as authService from '../services/auth.service.js';
 import { revokeCurrentSession, rotateSession } from '../services/session.service.js';
-import { ACCESS_COOKIE, clearAuthCookies, REFRESH_COOKIE, setAuthCookies } from '../utils/cookies.js';
+import {
+  ACCESS_COOKIE,
+  ADMIN_ACCESS_COOKIE,
+  ADMIN_REFRESH_COOKIE,
+  clearAdminAuthCookies,
+  clearAuthCookies,
+  REFRESH_COOKIE,
+  setAdminAuthCookies,
+  setAuthCookies,
+} from '../utils/cookies.js';
 import { sendSuccess } from '../utils/response.js';
 
 const requestContext = (req) => ({
@@ -21,38 +30,48 @@ export const register = async (req, res) => {
   sendSuccess(res, user, { status: 201, message: 'Account created' });
 };
 
-const loginTo = (portal) => async (req, res) => {
-  const { user, tokens } = await authService.login(req.validated.body, portal, requestContext(req));
-  setAuthCookies(res, tokens);
+// The store and the dashboard are separate logins, each with its own cookies.
+const STORE = { access: ACCESS_COOKIE, refresh: REFRESH_COOKIE, set: setAuthCookies, clear: clearAuthCookies, portal: 'STORE' };
+const ADMIN = { access: ADMIN_ACCESS_COOKIE, refresh: ADMIN_REFRESH_COOKIE, set: setAdminAuthCookies, clear: clearAdminAuthCookies, portal: 'ADMIN' };
+
+const loginTo = (area) => async (req, res) => {
+  const { user, tokens } = await authService.login(req.validated.body, area.portal, requestContext(req));
+  area.set(res, tokens);
   sendSuccess(res, user, { message: 'Logged in' });
 };
 
-export const customerLogin = loginTo('CUSTOMER');
-export const adminLogin = loginTo('ADMIN');
-
-export const refresh = async (req, res) => {
+const refreshIn = (area) => async (req, res) => {
   try {
-    const { user, ...tokens } = await rotateSession(req.cookies[REFRESH_COOKIE]);
-    setAuthCookies(res, tokens);
+    const { user, ...tokens } = await rotateSession(req.cookies[area.refresh]);
+    area.set(res, tokens);
     sendSuccess(res, user);
   } catch (error) {
-    clearAuthCookies(res);
+    area.clear(res);
     throw error;
   }
 };
 
-export const logout = async (req, res) => {
+const logoutOf = (area) => async (req, res) => {
   await revokeCurrentSession({
-    accessToken: req.cookies[ACCESS_COOKIE],
-    refreshToken: req.cookies[REFRESH_COOKIE],
+    accessToken: req.cookies[area.access],
+    refreshToken: req.cookies[area.refresh],
   });
-  clearAuthCookies(res);
+  area.clear(res);
   sendSuccess(res, null, { message: 'Logged out' });
 };
 
-export const getSession = (req, res) => {
-  sendSuccess(res, { user: req.user ?? null, canRefresh: !req.user && Boolean(req.cookies[REFRESH_COOKIE]) });
+const sessionIn = (area) => (req, res) => {
+  sendSuccess(res, { user: req.user ?? null, canRefresh: !req.user && Boolean(req.cookies[area.refresh]) });
 };
+
+export const customerLogin = loginTo(STORE);
+export const adminLogin = loginTo(ADMIN);
+export const refresh = refreshIn(STORE);
+export const adminRefresh = refreshIn(ADMIN);
+export const logout = logoutOf(STORE);
+export const adminLogout = logoutOf(ADMIN);
+export const getSession = sessionIn(STORE);
+export const getAdminSession = sessionIn(ADMIN);
 
 export const getMe = (req, res) => {
   sendSuccess(res, req.user);
@@ -80,5 +99,6 @@ export const forgotPassword = (req, res) => {
 export const resetPassword = async (req, res) => {
   await authService.resetPassword(req.validated.body);
   clearAuthCookies(res);
+  clearAdminAuthCookies(res);
   sendSuccess(res, null, { message: 'Password reset. Please log in with your new password.' });
 };

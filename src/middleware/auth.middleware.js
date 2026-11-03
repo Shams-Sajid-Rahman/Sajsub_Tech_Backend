@@ -1,11 +1,11 @@
 import { findActiveSession } from '../services/session.service.js';
 import { ApiError } from '../utils/ApiError.js';
-import { ACCESS_COOKIE } from '../utils/cookies.js';
+import { ACCESS_COOKIE, ADMIN_ACCESS_COOKIE } from '../utils/cookies.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 
 // The session is checked on every request, so logout, suspension and role changes apply at once.
-export const authenticate = async (req, res, next) => {
-  const token = req.cookies?.[ACCESS_COOKIE];
+const authenticateWith = (cookieName) => async (req, res, next) => {
+  const token = req.cookies?.[cookieName];
   if (!token) throw new ApiError(401, 'Authentication required');
 
   let payload;
@@ -23,9 +23,11 @@ export const authenticate = async (req, res, next) => {
   next();
 };
 
+export const authenticate = authenticateWith(ACCESS_COOKIE);
+
 // For routes that work for guests too: a missing or expired login simply means a guest.
-export const optionalAuthenticate = async (req, res, next) => {
-  const token = req.cookies?.[ACCESS_COOKIE];
+const optionalWith = (cookieName) => async (req, res, next) => {
+  const token = req.cookies?.[cookieName];
   if (token) {
     try {
       const payload = verifyAccessToken(token);
@@ -38,9 +40,13 @@ export const optionalAuthenticate = async (req, res, next) => {
   next();
 };
 
+export const optionalAuthenticate = optionalWith(ACCESS_COOKIE);
+export const optionalAdminAuthenticate = optionalWith(ADMIN_ACCESS_COOKIE);
+
 export const requireRole = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user?.role)) throw new ApiError(403, 'You do not have permission to do this');
   next();
 };
 
-export const requireAdmin = [authenticate, requireRole('ADMIN')];
+// Only the dashboard's own login opens admin routes. A store login never does, even for an admin account.
+export const requireAdmin = [authenticateWith(ADMIN_ACCESS_COOKIE), requireRole('ADMIN')];

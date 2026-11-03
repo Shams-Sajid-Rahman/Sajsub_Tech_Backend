@@ -13,6 +13,7 @@ export const productListQuerySchema = paginationSchema
     maxPrice: z.coerce.number().min(0).optional(),
     inStock: queryBoolean.optional(),
     onSale: queryBoolean.optional(),
+    minRating: z.coerce.number().min(0).max(5).optional(),
     slugs: z
       .string()
       .max(MAX_SLUGS * 221)

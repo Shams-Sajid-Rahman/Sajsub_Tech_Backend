@@ -56,7 +56,7 @@ const routesOf = (router, prefix) =>
       })),
     );
 
-const PUBLIC_ADMIN_ROUTES = new Set(['/auth/login', '/auth/logout']);
+const PUBLIC_ADMIN_ROUTES = new Set(['/auth/login', '/auth/logout', '/auth/refresh', '/auth/session']);
 const adminApi = routesOf(adminRoutes, '/api/admin').filter(({ template }) => !PUBLIC_ADMIN_ROUTES.has(template));
 const customerApi = [
   ...routesOf(cartRoutes, '/api/cart'),
@@ -76,7 +76,7 @@ test('every admin route refuses visitors and customers', async () => {
     const send = method === 'get' ? anonymous.get(path) : anonymous[method](path, {});
     assert.equal((await send).status, 401, `visitor ${method} ${path}`);
     const asCustomer = method === 'get' ? customer.get(path) : customer[method](path, {});
-    assert.equal((await asCustomer).status, 403, `customer ${method} ${path}`);
+    assert.equal((await asCustomer).status, 401, `customer ${method} ${path}`);
   }
 });
 
@@ -88,9 +88,9 @@ test('every customer route refuses visitors', async () => {
   }
 });
 
-test('admins cannot use customer-only shopping routes', async () => {
-  assert.equal((await admin.get('/api/cart')).status, 403);
-  assert.equal((await admin.get('/api/orders')).status, 403);
+test('a dashboard login alone does not open shopping routes', async () => {
+  assert.equal((await admin.get('/api/cart')).status, 401);
+  assert.equal((await admin.get('/api/orders')).status, 401);
 });
 
 test('every state-changing route needs a CSRF token', async () => {

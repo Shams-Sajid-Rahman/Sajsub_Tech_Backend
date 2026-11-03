@@ -95,6 +95,15 @@ test('slugs filter: returns only those products, and refuses bad input', async (
   assert.equal((await request(app).get(`/api/products?slugs=${tooMany}`)).status, 400);
 });
 
+test('minRating filter: keeps only products rated that high', async () => {
+  const [high, low] = await Promise.all([makeProduct({ ratingAverage: '4.5' }), makeProduct({ ratingAverage: '2.0' })]);
+  const res = await request(app).get(`/api/products?minRating=4&category=${category.slug}&limit=100`);
+  const slugs = res.body.data.map(({ slug }) => slug);
+  assert.ok(slugs.includes(high.slug));
+  assert.ok(!slugs.includes(low.slug));
+  assert.equal((await request(app).get('/api/products?minRating=9')).status, 400);
+});
+
 test('latest reviews: good written reviews only, with no private details', async () => {
   const product = await makeProduct();
   const other = await prisma.user.create({ data: { email: `${tag}-b@example.com`, passwordHash: 'not-used', firstName: 'Rafi', lastName: 'Karim' } });

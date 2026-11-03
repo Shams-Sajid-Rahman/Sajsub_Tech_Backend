@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import * as store from '../controllers/store.controller.js';
-import { authenticate, requireRole } from '../middleware/auth.middleware.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { idParamSchema } from '../validators/admin.validator.js';
 import * as schemas from '../validators/store.validator.js';
 
-const customerOnly = [authenticate, requireRole('CUSTOMER')];
+// Any store login can shop, including an admin account logged in on the store.
+const customerOnly = [authenticate];
 const byProduct = { params: schemas.productIdParamSchema };
 
 export const cartRoutes = Router();

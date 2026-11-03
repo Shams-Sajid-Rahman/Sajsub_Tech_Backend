@@ -230,12 +230,12 @@ test('anonymous requests cannot reach protected APIs', async () => {
   }
 });
 
-test('customers get 403 from every admin API, including with an old role in the token', async () => {
+test('a customer login opens no admin API', async () => {
   const { client } = await createCustomer('notadmin');
   for (const path of ['/api/admin/profile', '/api/admin/users', '/api/admin/anything']) {
-    assert.equal((await client.get(path)).status, 403, path);
+    assert.equal((await client.get(path)).status, 401, path);
   }
-  assert.equal((await client.patch('/api/admin/profile', { firstName: 'Hacker' })).status, 403);
+  assert.equal((await client.patch('/api/admin/profile', { firstName: 'Hacker' })).status, 401);
 });
 
 test('admin login, profile and logout work', async () => {
@@ -253,13 +253,61 @@ test('admin login, profile and logout work', async () => {
   assert.equal((await client.get('/api/admin/profile')).status, 401);
 });
 
-test('each login page only accepts its own account type', async () => {
+test('customers cannot log in to the dashboard', async () => {
   await createCustomer('portal');
   const client = await createClient();
   const customerAtAdmin = await client.post('/api/admin/auth/login', { email: emailFor('portal'), password: PASSWORD });
   assert.equal(customerAtAdmin.status, 401);
-  const adminAtCustomer = await client.post('/api/auth/login', { email: adminEmail, password: PASSWORD });
-  assert.equal(adminAtCustomer.status, 401);
+  assert.equal((await client.get('/api/admin/auth/session')).body.data.user, null);
+});
+
+test('a customer token placed in the admin cookie is still refused', async () => {
+  const client = await createClient();
+  const res = await client.post('/api/auth/register', { email: emailFor('forged'), password: PASSWORD, firstName: 'For', lastName: 'Ged' });
+  const token = cookieHeader(res, 'access_token').split(';')[0].split('=')[1];
+  const forged = await request(app).get('/api/admin/users').set('Cookie', `admin_access_token=${token}`);
+  assert.equal(forged.status, 403);
+});
+
+test('the dashboard and the store are separate logins', async () => {
+  const client = await createClient();
+  const adminLogin = await client.post('/api/admin/auth/login', { email: adminEmail, password: PASSWORD });
+  assert.equal(adminLogin.status, 200);
+  assert.ok(adminLogin.headers['set-cookie'].every((cookie) => cookie.startsWith('admin_') && cookie.includes('Path=/api/admin')));
+
+  // Logging in to the dashboard does not log in to the store.
+  assert.equal((await client.get('/api/auth/session')).body.data.user, null);
+  assert.equal((await client.get('/api/admin/auth/session')).body.data.user.email, adminEmail);
+
+  // The same account can log in to the store and shop like a customer.
+  assert.equal((await client.post('/api/auth/login', { email: adminEmail, password: PASSWORD })).status, 200);
+  assert.equal((await client.get('/api/auth/session')).body.data.user.email, adminEmail);
+  assert.equal((await client.get('/api/cart')).status, 200);
+
+  // Logging out of one leaves the other logged in.
+  assert.equal((await client.post('/api/auth/logout')).status, 200);
+  assert.equal((await client.get('/api/auth/session')).body.data.user, null);
+  assert.equal((await client.get('/api/admin/profile')).status, 200);
+  assert.equal((await client.post('/api/auth/login', { email: adminEmail, password: PASSWORD })).status, 200);
+  assert.equal((await client.post('/api/admin/auth/logout')).status, 200);
+  assert.equal((await client.get('/api/admin/profile')).status, 401);
+  assert.equal((await client.get('/api/auth/session')).body.data.user.email, adminEmail);
+});
+
+test('a store login on an admin account never opens the dashboard', async () => {
+  const client = await createClient();
+  assert.equal((await client.post('/api/auth/login', { email: adminEmail, password: PASSWORD })).status, 200);
+  assert.equal((await client.get('/api/admin/users')).status, 401);
+  assert.equal((await client.post('/api/admin/auth/refresh')).status, 401);
+});
+
+test('the dashboard login refreshes on its own', async () => {
+  const client = await createClient();
+  await client.post('/api/admin/auth/login', { email: adminEmail, password: PASSWORD });
+  const refreshed = await client.post('/api/admin/auth/refresh');
+  assert.equal(refreshed.status, 200);
+  assert.equal(refreshed.body.data.role, 'ADMIN');
+  assert.equal((await client.get('/api/admin/profile')).status, 200);
 });
 
 test('no public route can create an admin', async () => {

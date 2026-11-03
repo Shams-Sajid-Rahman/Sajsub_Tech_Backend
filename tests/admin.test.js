@@ -77,14 +77,14 @@ after(async () => {
 
 const ADMIN_PATHS = ['stats', 'notifications', 'users', 'products', 'categories', 'brands', 'inventory', 'orders', 'payments', 'banners', 'settings', 'logs/activity', 'logs/logins'];
 
-test('anonymous users get 401 and customers 403 on every admin API', async () => {
+test('anonymous users and customers are refused on every admin API', async () => {
   for (const path of ADMIN_PATHS) {
     assert.equal((await request(app).get(`/api/admin/${path}`)).status, 401, path);
-    assert.equal((await customerClient.get(`/api/admin/${path}`)).status, 403, path);
+    assert.equal((await customerClient.get(`/api/admin/${path}`)).status, 401, path);
     assert.equal((await admin.get(`/api/admin/${path}`)).status, 200, path);
   }
-  assert.equal((await customerClient.post('/api/admin/products', {})).status, 403);
-  assert.equal((await customerClient.delete(`/api/admin/products/${randomUUID()}`)).status, 403);
+  assert.equal((await customerClient.post('/api/admin/products', {})).status, 401);
+  assert.equal((await customerClient.delete(`/api/admin/products/${randomUUID()}`)).status, 401);
 });
 
 test('statistics match the database and react to changes', async () => {

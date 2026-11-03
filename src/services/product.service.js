@@ -64,7 +64,7 @@ const priceAtMost = (value) => ({
   OR: [{ discountPrice: { lte: value } }, { discountPrice: null, price: { lte: value } }],
 });
 
-const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock, onSale, slugs }) => {
+const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inStock, onSale, slugs, minRating }) => {
   const conditions = [PUBLIC_WHERE];
   if (search) {
     // Every word has to match somewhere, so "sony headphones" finds Sony products in the audio category.
@@ -88,6 +88,7 @@ const buildWhere = ({ search, category, brand, featured, minPrice, maxPrice, inS
   if (inStock !== undefined) conditions.push({ stockQuantity: inStock ? { gt: 0 } : 0 });
   if (onSale) conditions.push({ discountPrice: { not: null } });
   if (slugs) conditions.push({ slug: { in: slugs } });
+  if (minRating !== undefined) conditions.push({ ratingAverage: { gte: minRating } });
   return { AND: conditions };
 };
 
