@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { noStore, publicCache } from '../middleware/cache.middleware.js';
 import { requireCsrf } from '../middleware/csrf.middleware.js';
 import { getSite, sendContact } from '../controllers/store.controller.js';
 import { accountLimiter, apiLimiter } from '../middleware/rateLimit.middleware.js';
@@ -17,6 +18,8 @@ import productRoutes from './product.routes.js';
 
 const router = Router();
 
+router.use(noStore);
+
 // Health checks sit outside the rate limit so monitoring can poll them.
 router.use('/health', healthRoutes);
 router.use('/payments/sslcommerz', paymentRoutes);
@@ -27,14 +30,14 @@ router.use(requireCsrf);
 router.use('/auth', authRoutes);
 router.use('/users', plannedRoutes('users'));
 router.use('/products', productRoutes);
-router.use('/categories', categoryRoutes);
-router.use('/brands', brandRoutes);
+router.use('/categories', publicCache, categoryRoutes);
+router.use('/brands', publicCache, brandRoutes);
 router.use('/inventory', plannedRoutes('inventory'));
 router.use('/cart', cartRoutes);
 router.use('/wishlist', wishlistRoutes);
 router.use('/orders', orderRoutes);
 router.use('/addresses', addressRoutes);
-router.get('/site', getSite);
+router.get('/site', publicCache, getSite);
 router.post('/contact', accountLimiter, validate({ body: contactSchema }), sendContact);
 router.use('/ai', aiRoutes);
 router.use('/admin', adminRoutes);

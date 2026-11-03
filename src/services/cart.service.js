@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { CARD_INCLUDE, isPurchasable, toPublicProduct } from './product.service.js';
 
 const DEFAULT_SHIPPING_FEE = 120;
+const MAX_LINE_QUANTITY = 99;
 
 const getSettingNumber = async (client, key, fallback) => {
   const setting = await client.siteSetting.findUnique({ where: { key } });
@@ -86,6 +87,7 @@ export const addCartItem = async (userId, { productId, quantity }) => {
   const cart = await getOrCreateCart(prisma, userId);
   const existing = await prisma.cartItem.findUnique({ where: { cartId_productId: { cartId: cart.id, productId } } });
   const nextQuantity = (existing?.quantity ?? 0) + quantity;
+  if (nextQuantity > MAX_LINE_QUANTITY) throw new ApiError(400, `You can have at most ${MAX_LINE_QUANTITY} of one item`);
   await findPurchasable(productId, nextQuantity);
   await prisma.cartItem.upsert({
     where: { cartId_productId: { cartId: cart.id, productId } },

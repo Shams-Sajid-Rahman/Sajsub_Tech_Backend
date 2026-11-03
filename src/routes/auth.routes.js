@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as auth from '../controllers/auth.controller.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware.js';
 import { accountLimiter, loginLimiter } from '../middleware/rateLimit.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
@@ -15,6 +15,7 @@ import {
 const router = Router();
 
 router.get('/csrf-token', auth.getCsrfToken);
+router.get('/session', optionalAuthenticate, auth.getSession);
 
 router.post('/register', accountLimiter, validate({ body: registerSchema }), auth.register);
 router.post('/login', loginLimiter, validate({ body: loginSchema }), auth.customerLogin);

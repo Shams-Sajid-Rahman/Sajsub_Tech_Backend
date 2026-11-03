@@ -21,6 +21,8 @@ const BODY_PARSER_ERRORS = {
 const toClientError = (err) => {
   if (err instanceof ApiError) return [err.status, err.message, err.errors];
   if (BODY_PARSER_ERRORS[err.type]) return BODY_PARSER_ERRORS[err.type];
+  // Express and its body parser mark bad requests themselves, such as a malformed web address.
+  if (err.status >= 400 && err.status < 500) return [err.status, 'This request could not be understood'];
   if (err instanceof Prisma.PrismaClientKnownRequestError && PRISMA_ERRORS[err.code]) {
     return PRISMA_ERRORS[err.code];
   }

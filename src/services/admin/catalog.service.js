@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { toSkipTake } from '../../utils/pagination.js';
-import { slugify } from '../../utils/slug.js';
+import { uniqueSlug } from '../../utils/slug.js';
 import { destroyImages } from '../cloudinary.service.js';
 
 const listActivable = async (model, { search, isActive, ...pagination }, options) => {
@@ -33,8 +33,8 @@ const assertNoCycle = async (id, parentId) => {
   }
 };
 
-export const createCategory = (data) =>
-  prisma.category.create({ data: { ...data, slug: data.slug ?? slugify(data.name) } });
+export const createCategory = async (data) =>
+  prisma.category.create({ data: { ...data, slug: data.slug ?? (await uniqueSlug(prisma.category, data.name)) } });
 
 export const updateCategory = async (id, data) => {
   if (data.parentId) await assertNoCycle(id, data.parentId);
@@ -65,7 +65,8 @@ export const listAdminBrands = (query) =>
     orderBy: { name: 'asc' },
   });
 
-export const createBrand = (data) => prisma.brand.create({ data: { ...data, slug: data.slug ?? slugify(data.name) } });
+export const createBrand = async (data) =>
+  prisma.brand.create({ data: { ...data, slug: data.slug ?? (await uniqueSlug(prisma.brand, data.name)) } });
 
 export const updateBrand = (id, data) => prisma.brand.update({ where: { id }, data });
 

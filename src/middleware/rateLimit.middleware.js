@@ -13,7 +13,8 @@ export const createRateLimiter = ({ max, windowMs = FIFTEEN_MINUTES, skipSuccess
     handler: (req, res) => sendError(res, 429, 'Too many requests. Please try again later.'),
   });
 
-export const apiLimiter = createRateLimiter({ max: 300 });
+// Generous, because mobile networks in Bangladesh can put many customers behind one IP address.
+export const apiLimiter = createRateLimiter({ max: 1000 });
 
 // Counts failures only, to slow password guessing without affecting normal logins.
 export const loginLimiter = createRateLimiter({ max: 10, skipSuccessfulRequests: true });

@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma.js';
 import { ApiError } from '../../utils/ApiError.js';
 import { toSkipTake } from '../../utils/pagination.js';
-import { slugify } from '../../utils/slug.js';
+import { uniqueSlug } from '../../utils/slug.js';
 import { destroyImages } from '../cloudinary.service.js';
 import { adjustStock } from '../inventory.service.js';
 
@@ -56,12 +56,13 @@ const statusDates = (status, previousStatus) => {
   return {};
 };
 
-export const createProduct = ({ initialStock, specifications = [], ...fields }, performedById) =>
-  prisma.$transaction(async (tx) => {
+export const createProduct = async ({ initialStock, specifications = [], ...fields }, performedById) => {
+  const slug = fields.slug ?? (await uniqueSlug(prisma.product, fields.name));
+  return prisma.$transaction(async (tx) => {
     const product = await tx.product.create({
       data: {
         ...fields,
-        slug: fields.slug ?? slugify(fields.name),
+        slug,
         ...statusDates(fields.status),
         specifications: { create: specificationRows(specifications) },
       },
@@ -74,6 +75,7 @@ export const createProduct = ({ initialStock, specifications = [], ...fields }, 
     }
     return tx.product.findUnique({ where: { id: product.id }, include: DETAIL_INCLUDE });
   });
+};
 
 export const updateProduct = (id, { specifications, ...fields }) =>
   prisma.$transaction(async (tx) => {

@@ -89,6 +89,13 @@ export const revokeCurrentSession = async ({ accessToken, refreshToken }) => {
   });
 };
 
+// Old login records have no further use, and would otherwise pile up forever.
+export const purgeExpiredAuthData = async () => {
+  const now = new Date();
+  await prisma.userSession.deleteMany({ where: { expiresAt: { lt: now } } });
+  await prisma.passwordResetToken.deleteMany({ where: { expiresAt: { lt: now } } });
+};
+
 export const revokeUserSessions = (client, userId, exceptSessionId) =>
   client.userSession.updateMany({
     where: { userId, revokedAt: null, ...(exceptSessionId && { id: { not: exceptSessionId } }) },

@@ -2,6 +2,7 @@ import app from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/prisma.js';
 import { purgeOldConversations } from './services/ai/assistant.service.js';
+import { purgeExpiredAuthData } from './services/session.service.js';
 import { expireUnpaidOnlineOrders } from './services/payments/payment.service.js';
 
 const EXPIRY_CHECK_MS = 5 * 60 * 1000;
@@ -30,6 +31,7 @@ expiryTimer.unref();
 
 const purgeTimer = setInterval(() => {
   purgeOldConversations().catch((error) => console.error('Chat cleanup failed:', error.message));
+  purgeExpiredAuthData().catch((error) => console.error('Session cleanup failed:', error.message));
 }, PURGE_CHECK_MS);
 purgeTimer.unref();
 

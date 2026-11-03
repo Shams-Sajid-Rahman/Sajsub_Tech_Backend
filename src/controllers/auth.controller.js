@@ -50,6 +50,10 @@ export const logout = async (req, res) => {
   sendSuccess(res, null, { message: 'Logged out' });
 };
 
+export const getSession = (req, res) => {
+  sendSuccess(res, { user: req.user ?? null, canRefresh: !req.user && Boolean(req.cookies[REFRESH_COOKIE]) });
+};
+
 export const getMe = (req, res) => {
   sendSuccess(res, req.user);
 };

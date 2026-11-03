@@ -114,6 +114,7 @@ model User {
   inventoryTransactions InventoryTransaction[]
 
   @@index([role, status])
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -164,6 +165,7 @@ model LoginLog {
 
   @@index([userId])
   @@index([email, createdAt])
+  @@index([createdAt])
   @@map("login_logs")
 }
 
@@ -439,6 +441,7 @@ model Order {
   @@index([userId, placedAt])
   @@index([status, placedAt])
   @@index([paymentStatus])
+  @@index([placedAt])
   @@map("orders")
 }
 
@@ -487,6 +490,7 @@ model Payment {
   @@index([orderId])
   @@index([status])
   @@index([needsRefund])
+  @@index([createdAt])
   @@map("payments")
 }
 
@@ -541,6 +545,7 @@ model AIConversation {
 
   @@index([userId, updatedAt])
   @@index([guestKey])
+  @@index([updatedAt])
   @@map("ai_conversations")
 }
 
@@ -575,6 +580,7 @@ model AuditLog {
 
   @@index([actorId, createdAt])
   @@index([entityType, entityId])
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
